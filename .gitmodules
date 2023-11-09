@@ -1,0 +1,3 @@
+[submodule "parkinglot/perception/lane_detection/YOLOPv2"]
+	path = parkinglot/perception/lane_detection/YOLOPv2
+	url = https://github.com/CAIC-AD/YOLOPv2.git
