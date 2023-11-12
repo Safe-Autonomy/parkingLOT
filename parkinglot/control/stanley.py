@@ -267,11 +267,12 @@ class Global_Stanley(object):
             self.target_path_points_y   = self.path_points_y[target_idx]
             self.target_path_points_yaw = self.path_points_yaw[target_idx]
 
-            # find the closest point
-            dx = [curr_x - x for x in self.target_path_points_x]
-            dy = [curr_y - y for y in self.target_path_points_y]
+            # find the closest point - closest point is the first point in the list
+            # target_num = 2
+            # dx = [curr_x - x for x in self.target_path_points_x]
+            # dy = [curr_y - y for y in self.target_path_points_y]
 
-            # find the index of closest point
+            # find the index of target point - choose whatever point we want
             target_point_idx = int(np.argmin(np.hypot(dx, dy)))
 
 
@@ -395,6 +396,11 @@ class Local_Stanley(object):
     # Get value of steering wheel
     def steer_callback(self, msg):
         self.steer = round(np.degrees(msg.output),1)
+
+    def planner_callback(self, msg):
+        # TODO
+        pass
+
 
 
     # Get predefined waypoints based on local planner(perception)
