@@ -9,9 +9,6 @@ import matplotlib.pyplot as plt
 from skimage import morphology
 from scipy import ndimage
 
-import rospy
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge, CvBridgeError
 
 from YOLOPv2.utils.utils import (time_synchronized,
                                   select_device, 
@@ -28,27 +25,37 @@ from YOLOPv2.utils.utils import (time_synchronized,
 
 from utils.dataloader import LoadImage
 from utils.line_fit import line_fit, tune_fit, bird_fit, final_viz
-from utils.line import Line
+from utils.misc import Line, perspective_transform
 
-from parkinglot.topics import SIM_CAMERA_TOPIC, GEM_CAMERA_TOPIC
+# from parkinglot.topics import SIM_CAMERA_TOPIC, GEM_CAMERA_TOPIC
 
 class LaneDetector():
-    def __init__(self, image_topic: str, device=None) -> None:
+    def __init__(self, image_topic: str, device=None, enable_ros=True) -> None:
+
+        # ------------- Rospy Init-------------
+        if enable_ros:
+            # import ros packages
+            import rospy
+            from sensor_msgs.msg import Image
+            from cv_bridge import CvBridge, CvBridgeError
+            from parkinglot.topics import SIM_CAMERA_TOPIC, GEM_CAMERA_TOPIC
+
+            # init ros node
+            self.cameraSub = rospy.Subscriber(image_topic, Image, self.image_handler, queue_size=1)
+            self.laneDetPub = rospy.Publisher("lane_detection/image", Image, queue_size=1)
+            self.bridge = CvBridge()
+
         # ------------- YOLOPv2 Init-------------
         # Load model
         # weights = '/home/gem/Documents/gem_01/src/parkingLOT/parkinglot/perception/lane_detection/YOLOPv2/data/weights/yolopv2.pt' # gem absolute path
-        weights = '/home/ziruiw3/ece484fa23/parkingLOT/parkinglot/perception/lane_detection/YOLOPv2/data/weights/yolopv2.pt'   # local absolute path
+        # weights = '/home/ziruiw3/ece484fa23/parkingLOT/parkinglot/perception/lane_detection/YOLOPv2/data/weights/yolopv2.pt'   # local absolute path
+        weights = './YOLOPv2/data/weights/yolopv2.pt'   # local relative path
 
         self.device = device
         self.model = torch.jit.load(weights).to(device=self.device)
         self.model.half() if torch.cuda.is_available() else self.model.float()
         self.model.eval() # set model to eval mode
         self.imgsz = 640
-
-        # ------------- Rospy Init-------------
-        self.cameraSub = rospy.Subscriber(image_topic, Image, self.image_handler, queue_size=1)
-        self.laneDetPub = rospy.Publisher("lane_detection/image", Image, queue_size=1)
-        self.bridge = CvBridge()
 
         # ------------- Lane Detection Init-------------
         self.left_line = Line(n=5)
@@ -128,7 +135,6 @@ class LaneDetector():
 
         inf_time.update(t2-t1,img.size(0))
         nms_time.update(t4-t3,img.size(0))
-        waste_time.update(tw2-tw1,img.size(0))
         print('inf : (%.4fs/frame)   nms : (%.4fs/frame)' % (inf_time.avg,nms_time.avg))
         print(f'Done. ({time.time() - t0:.3f}s)')
 
@@ -141,44 +147,20 @@ class LaneDetector():
         """
         # White Line Detector : 
         # Convert to LUV color space and threshold
-        l = cv2.cvtColor(img, cv2.COLOR_RGB2LUV)[:, :, 0]
-        l_bin = np.zeros_like(l)
-        l_bin[(l >= thresh_l[0]) & (l <= thresh_l[1])] = 1
-        combine = l_bin
-        
-        return combine
+        white_lane = cv2.cvtColor(img, cv2.COLOR_RGB2LUV)[:, :, 0]
+        white_lane_mask = np.zeros_like(white_lane)
+        white_lane_mask[(white_lane >= thresh_l[0]) & (white_lane <= thresh_l[1])] = 1
+
+        return white_lane_mask
     
-    def perspective_transform(self, img, verbose=False):
-        """
-        Get bird's eye view from input image
-        points for transformation in this format:
-            [bottom-left, bottom-right, top-left, top-right]
-        """
-
-        bottom_left = [0,700]
-        bottom_right = [1280,700]
-        top_left = [50,500]
-        top_right = [1200,500]
-
-        # Define 4 source points and 4 destination points
-        src = np.float32([bottom_left,bottom_right,top_left,top_right])
-        dst = np.float32([[0, 480], [640, 480], [0, 0], [640, 0]])
-
-        #Get M, the transform matrix, and Minv, the inverse
-        M = cv2.getPerspectiveTransform(src, dst)
-        Minv = cv2.getPerspectiveTransform(dst, src)
-
-        # Warp the image using OpenCV warpPerspective()
-        warped_img = cv2.warpPerspective(np.float32(img), M, (640, 480), flags=cv2.INTER_LINEAR)
-
-        return warped_img, M, Minv
-
-    def extract_waypoints(self, binaryImage):
-
-        img_birdeye, M, Minv = self.perspective_transform(binaryImage)
+    def extract_waypoints(self, camera_img, lane_mask):
+        
+        # Perspective Transform
+        img_birdeye, M, Minv = perspective_transform(lane_mask)
         cv2.imwrite('./visualization/birdeye.png',img_birdeye*255)
-        labeled, nr_objects = ndimage.label(img_birdeye)
-        print("numer of CC: ",nr_objects)
+        # find numer of lanes
+        labeled, num_lanes = ndimage.label(img_birdeye)
+        print("numer of lanes: ",num_lanes)
         if not self.hist:
             # Fit lane without previous result
             ret = line_fit(img_birdeye)
@@ -198,7 +180,6 @@ class LaneDetector():
                     right_fit = self.right_line.add_fit(right_fit)
 
                     self.detected = True
-
             else:
                 left_fit = self.left_line.get_fit()
                 right_fit = self.right_line.get_fit()
@@ -221,35 +202,30 @@ class LaneDetector():
             print(mid_line_pts.shape)
             if ret is not None:
                 bird_fit_img = bird_fit(img_birdeye, ret, save_file=None)
-                combine_fit_img = final_viz(img, left_fit, right_fit, mid_line_pts, Minv)
+                combine_fit_img = final_viz(camera_img, left_fit, right_fit, mid_line_pts, Minv)
             else:
                 print("Unable to detect lanes")
 
             return combine_fit_img, bird_fit_img, ret
         
-    def detect_lane_pipeline(self, img, apply_obj_det=False, visualize=False):
-        ll_seg_mask = self.detect_lanes_yolop(img,apply_obj_det=False)
-        color_thresh_mask = self.detect_lanes_color(img)
+    def detect_lane_pipeline(self, camera_img, apply_obj_det=False, visualize=False):
+
+        # detect lanes
+        ll_seg_mask = self.detect_lanes_yolop(camera_img,apply_obj_det=False)
+        color_thresh_mask = self.detect_lanes_color(camera_img)
+        
+        # extract lane mask
+        raw_lane_mask = np.zeros_like(ll_seg_mask)
+        raw_lane_mask[(ll_seg_mask == 1) & (color_thresh_mask == 1)] = 1
+        
+        raw_lane_mask = cv2.GaussianBlur(raw_lane_mask.astype(np.float32),(7,7),0)
+        lane_mask = morphology.remove_small_objects(raw_lane_mask.astype('bool'),min_size=400,connectivity=2)
         
         if visualize:
-            cv2.imwrite('./visualization/yolop_mask.png',ll_seg_mask*255)
-            cv2.imwrite('./visualization/color_thresh_mask.png',color_thresh_mask*255)
+            cv2.imwrite('./visualization/lane_mask.png',lane_mask*255)
 
-        # combine the result from the two (logic AND)
-        combine = np.zeros_like(ll_seg_mask)
-        combine[(ll_seg_mask == 1) & (color_thresh_mask == 1)] = 1
-        
-        if visualize:
-            cv2.imwrite('./visualization/combine_mask.png',combine*255)
-
-        binaryImage = morphology.remove_small_objects(combine.astype('bool'),min_size=400,connectivity=2)
-        blured = cv2.GaussianBlur(binaryImage.astype(np.float32),(7,7),0)
-        
-        if visualize:
-            cv2.imwrite('./visualization/lanes.png',blured*255)
-
-        # extract waypoints
-        combine_fit_img, bird_fit_img, ret = self.extract_waypoints(blured)   # mid_line_pts (N,2)
+        # extract waypoints from lane mask
+        combine_fit_img, bird_fit_img, ret = self.extract_waypoints(lane_mask)   # mid_line_pts (N,2)
         
         if visualize:
             cv2.imwrite('./visualization/combine_fit.png',combine_fit_img)
@@ -269,6 +245,7 @@ def detect_lanes():
     while not rospy.core.is_shutdown():
         rospy.rostime.wallsleep(0.5)
 
+# NOTE: Scripts below are for GEM testing
 # if __name__ == "__main__":
 #     parser = argparse.ArgumentParser(description='Arguments for lane following')
 #     # parser.add_argument('--gem', action=argparse.BooleanOptionalAction, help='Add this flag to run on vehicle')
@@ -288,8 +265,9 @@ if __name__ == '__main__':
     # rospy.spin()
 
     # img = cv2.imread('/home/gem/Documents/gem_01/src/parkingLOT/parkinglot/perception/YOLOPv2/data/samples/1.jpg')
-    img = cv2.imread('/home/ziruiw3/ece484fa23/parkingLOT/parkinglot/perception/lane_detection/data/50.png')
-    lane_detector = LaneDetector(image_topic=None, device=torch.device('cuda:0'))
+    # img = cv2.imread('/home/ziruiw3/ece484fa23/parkingLOT/parkinglot/perception/lane_detection/data/50.png')
+    img = cv2.imread('data/50.png')
+    lane_detector = LaneDetector(image_topic=None, device=torch.device('cuda:0'), enable_ros = False)
     count = 1
     for i in range(count):
         lane_detector.detect_lane_pipeline(img, apply_obj_det=False, visualize=True)

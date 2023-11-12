@@ -5,6 +5,31 @@ import matplotlib.image as mpimg
 import pickle
 
 
+def perspective_transform(img, verbose=False):
+	"""
+	Get bird's eye view from input image
+	points for transformation in this format:
+		[bottom-left, bottom-right, top-left, top-right]
+	"""
+
+	bottom_left = [0,700]
+	bottom_right = [1280,700]
+	top_left = [50,500]
+	top_right = [1200,500]
+
+	# Define 4 source points and 4 destination points
+	src = np.float32([bottom_left,bottom_right,top_left,top_right])
+	dst = np.float32([[0, 480], [640, 480], [0, 0], [640, 0]])
+
+	#Get M, the transform matrix, and Minv, the inverse
+	M = cv2.getPerspectiveTransform(src, dst)
+	Minv = cv2.getPerspectiveTransform(dst, src)
+
+	# Warp the image using OpenCV warpPerspective()
+	warped_img = cv2.warpPerspective(np.float32(img), M, (640, 480), flags=cv2.INTER_LINEAR)
+
+	return warped_img, M, Minv
+
 # Define a class to receive the characteristics of each line detection
 class Line():
 	def __init__(self, n):
