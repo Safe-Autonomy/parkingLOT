@@ -24,7 +24,7 @@ from YOLOPv2.utils.utils import (time_synchronized,
                                   AverageMeter)
 
 from utils.dataloader import LoadImage
-from utils.line_fit import line_fit, tune_fit, bird_fit, final_viz, fit_one_lane, fit_two_lane
+from utils.line_fit import line_fit, tune_fit, bird_viz, final_viz, fit_one_lane, fit_two_lane
 from utils.misc import Line, perspective_transform
 
 # from parkinglot.topics import SIM_CAMERA_TOPIC, GEM_CAMERA_TOPIC
@@ -164,7 +164,7 @@ class LaneDetector():
 
         # check num of lanes
         if num_lanes == 1:
-            center_waypoints = fit_one_lane(labeled_lanes)
+            mid_line_pts = fit_one_lane(labeled_lanes)
         elif num_lanes == 2:
             mid_line_pts = fit_two_lane(labeled_lanes)
             # lane1[labeled_lanes == 1] = 1
@@ -173,8 +173,10 @@ class LaneDetector():
             # cv2.imwrite('visualization/right_lane.png',lane2*255)
         
         print(mid_line_pts)
+        birdeye_fit_img = bird_viz(img_birdeye, mid_line_pts)
         combine_fit_img = final_viz(camera_img, mid_line_pts, Minv)
         cv2.imwrite('visualization/combine_fit_img.png',combine_fit_img)
+        cv2.imwrite('visualization/birdeye_fit_img.png',birdeye_fit_img)
 
         return None, None, None
         exit(0)
@@ -283,7 +285,7 @@ if __name__ == '__main__':
 
     # img = cv2.imread('/home/gem/Documents/gem_01/src/parkingLOT/parkinglot/perception/YOLOPv2/data/samples/1.jpg')
     # img = cv2.imread('/home/ziruiw3/ece484fa23/parkingLOT/parkinglot/perception/lane_detection/data/50.png')
-    img = cv2.imread('data/500.png')
+    img = cv2.imread('data/150.png')
     lane_detector = LaneDetector(image_topic=None, device=torch.device('cuda:0'), enable_ros = False)
     count = 1
     for i in range(count):
