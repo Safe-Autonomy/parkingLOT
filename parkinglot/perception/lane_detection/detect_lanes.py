@@ -24,7 +24,7 @@ from YOLOPv2.utils.utils import (time_synchronized,
                                   AverageMeter)
 
 from utils.dataloader import LoadImage
-from utils.line_fit import line_fit, tune_fit, bird_fit, final_viz
+from utils.line_fit import line_fit, tune_fit, bird_fit, final_viz, fit_one_lane, fit_two_lane
 from utils.misc import Line, perspective_transform
 
 # from parkinglot.topics import SIM_CAMERA_TOPIC, GEM_CAMERA_TOPIC
@@ -154,59 +154,75 @@ class LaneDetector():
         return white_lane_mask
     
     def extract_waypoints(self, camera_img, lane_mask):
-        
+
         # Perspective Transform
         img_birdeye, M, Minv = perspective_transform(lane_mask)
         cv2.imwrite('./visualization/birdeye.png',img_birdeye*255)
         # find numer of lanes
-        labeled, num_lanes = ndimage.label(img_birdeye)
-        print("numer of lanes: ",num_lanes)
-        if not self.hist:
-            # Fit lane without previous result
-            ret = line_fit(img_birdeye)
-            print(ret['waypoints'])
-            left_fit = ret['left_fit']
-            right_fit = ret['right_fit']
-        else:
-            # Fit lane with previous result
-            if not self.detected:
-                ret = line_fit(img_birdeye)
+        labeled_lanes, num_lanes = ndimage.label(img_birdeye)
+        print("numer of lanes:", num_lanes)
 
-                if ret is not None:
-                    left_fit = ret['left_fit']
-                    right_fit = ret['right_fit']
+        # check num of lanes
+        if num_lanes == 1:
+            center_waypoints = fit_one_lane(labeled_lanes)
+        elif num_lanes == 2:
+            mid_line_pts = fit_two_lane(labeled_lanes)
+            # lane1[labeled_lanes == 1] = 1
+            # lane2[labeled_lanes == 2] = 1
+            # cv2.imwrite('visualization/left_lane.png',lane1*255)
+            # cv2.imwrite('visualization/right_lane.png',lane2*255)
+        
+        print(mid_line_pts)
+        combine_fit_img = final_viz(camera_img, mid_line_pts, Minv)
+        cv2.imwrite('visualization/combine_fit_img.png',combine_fit_img)
 
-                    left_fit = self.left_line.add_fit(left_fit)
-                    right_fit = self.right_line.add_fit(right_fit)
+        return None, None, None
+        exit(0)
+        
+        # if not self.hist:
+        #     # Fit lane without previous result
+        #     ret = line_fit(img_birdeye)
+        #     print(ret['waypoints'])
+        #     left_fit = ret['left_fit']
+        #     right_fit = ret['right_fit']
+        # else:
+        #     # Fit lane with previous result
+        #     if not self.detected:
+        #         ret = line_fit(img_birdeye)
 
-                    self.detected = True
-            else:
-                left_fit = self.left_line.get_fit()
-                right_fit = self.right_line.get_fit()
-                ret = tune_fit(img_birdeye, left_fit, right_fit)
+        #         if ret is not None:
+        #             left_fit = ret['left_fit']
+        #             right_fit = ret['right_fit']
 
-                if ret is not None:
-                    left_fit = ret['left_fit']
-                    right_fit = ret['right_fit']
+        #             left_fit = self.left_line.add_fit(left_fit)
+        #             right_fit = self.right_line.add_fit(right_fit)
 
-                    left_fit = self.left_line.add_fit(left_fit)
-                    right_fit = self.right_line.add_fit(right_fit)
+        #             self.detected = True
+        #     else:
+        #         left_fit = self.left_line.get_fit()
+        #         right_fit = self.right_line.get_fit()
+        #         ret = tune_fit(img_birdeye, left_fit, right_fit)
 
-                else:
-                    self.detected = False
+        #         if ret is not None:
+        #             left_fit = ret['left_fit']
+        #             right_fit = ret['right_fit']
 
-            # Annotate original image
-            bird_fit_img = None
-            combine_fit_img = None
-            mid_line_pts = ret['waypoints']
-            print(mid_line_pts.shape)
-            if ret is not None:
-                bird_fit_img = bird_fit(img_birdeye, ret, save_file=None)
-                combine_fit_img = final_viz(camera_img, left_fit, right_fit, mid_line_pts, Minv)
-            else:
-                print("Unable to detect lanes")
+        #             left_fit = self.left_line.add_fit(left_fit)
+        #             right_fit = self.right_line.add_fit(right_fit)
 
-            return combine_fit_img, bird_fit_img, ret
+        #         else:
+        #             self.detected = False
+
+        #     # Annotate original image
+        #     bird_fit_img = None
+        #     combine_fit_img = None
+        #     if ret is not None:
+        #         bird_fit_img = bird_fit(img_birdeye, ret, save_file=None)
+        #         combine_fit_img = final_viz(camera_img, left_fit, right_fit, mid_line_pts, Minv)
+        #     else:
+        #         print("Unable to detect lanes")
+
+        #     return combine_fit_img, bird_fit_img, ret
         
     def detect_lane_pipeline(self, camera_img, apply_obj_det=False, visualize=False):
 
@@ -218,14 +234,15 @@ class LaneDetector():
         raw_lane_mask = np.zeros_like(ll_seg_mask)
         raw_lane_mask[(ll_seg_mask == 1) & (color_thresh_mask == 1)] = 1
         
-        raw_lane_mask = cv2.GaussianBlur(raw_lane_mask.astype(np.float32),(7,7),0)
-        lane_mask = morphology.remove_small_objects(raw_lane_mask.astype('bool'),min_size=400,connectivity=2)
+        raw_lane_mask = morphology.remove_small_objects(raw_lane_mask.astype('bool'),min_size=400,connectivity=2)
+
+        lane_mask = cv2.GaussianBlur(raw_lane_mask.astype(np.float32),(9,9),0)
         
         if visualize:
             cv2.imwrite('./visualization/lane_mask.png',lane_mask*255)
 
         # extract waypoints from lane mask
-        combine_fit_img, bird_fit_img, ret = self.extract_waypoints(lane_mask)   # mid_line_pts (N,2)
+        combine_fit_img, bird_fit_img, ret = self.extract_waypoints(camera_img,lane_mask)   # mid_line_pts (N,2)
         
         if visualize:
             cv2.imwrite('./visualization/combine_fit.png',combine_fit_img)
@@ -266,7 +283,7 @@ if __name__ == '__main__':
 
     # img = cv2.imread('/home/gem/Documents/gem_01/src/parkingLOT/parkinglot/perception/YOLOPv2/data/samples/1.jpg')
     # img = cv2.imread('/home/ziruiw3/ece484fa23/parkingLOT/parkinglot/perception/lane_detection/data/50.png')
-    img = cv2.imread('data/50.png')
+    img = cv2.imread('data/500.png')
     lane_detector = LaneDetector(image_topic=None, device=torch.device('cuda:0'), enable_ros = False)
     count = 1
     for i in range(count):

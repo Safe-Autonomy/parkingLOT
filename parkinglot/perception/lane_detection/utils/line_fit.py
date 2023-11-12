@@ -270,27 +270,27 @@ def bird_fit(binary_warped, ret, save_file=None):
 
 	return result
 
-def final_viz(undist, left_fit, right_fit, mid_line_pts, m_inv):
+def final_viz(undist,mid_line_pts, m_inv):
 	"""
 	Final lane line prediction visualized and overlayed on top of original image
 	"""
-	# Generate x and y values for plotting
-	ploty = np.linspace(0, undist.shape[0]-1, undist.shape[0])
-	left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
-	right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+	# # Generate x and y values for plotting
+	# ploty = np.linspace(0, undist.shape[0]-1, undist.shape[0])
+	# left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+	# right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
 
 	# Create an image to draw the lines on
 	#warp_zero = np.zeros_like(warped).astype(np.uint8)
 	#color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 	color_warp = np.zeros((720, 1280, 3), dtype='uint8')  # NOTE: Hard-coded image dimensions
 
-	# Recast the x and y points into usable format for cv2.fillPoly()
-	pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
-	pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
-	pts = np.hstack((pts_left, pts_right))
+	# # Recast the x and y points into usable format for cv2.fillPoly()
+	# pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+	# pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+	# pts = np.hstack((pts_left, pts_right))
 
-	# Draw the lane onto the warped blank image
-	cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
+	# # Draw the lane onto the warped blank image
+	# cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
 
 	# draw waypoints as circles 
 	for i in range(len(mid_line_pts)):
@@ -302,6 +302,53 @@ def final_viz(undist, left_fit, right_fit, mid_line_pts, m_inv):
 	# Convert arrays to 8 bit for later cv to ros image transfer
 	undist = np.array(undist, dtype=np.uint8)
 	newwarp = np.array(newwarp, dtype=np.uint8)
-	result = cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
+	result = cv2.addWeighted(undist, 1, newwarp, 1, 0)
 
 	return result
+
+
+def fit_one_lane(labeled_lanes,num_points=10):
+	lane = np.zeros_like(labeled_lanes)
+	lane[labeled_lanes != 0 ] = 1
+	cv2.imwrite('visualization/one_lane.png',lane*255)
+
+
+
+def fit_two_lane(labeled_lanes, num_points=10):
+	lane1 = np.zeros_like(labeled_lanes)
+	lane2 = np.zeros_like(labeled_lanes)
+	lane1[labeled_lanes == 1] = 1
+	lane2[labeled_lanes == 2] = 1
+
+	# find x and y coodiate for two lane
+	nonzero_lane1 = lane1.nonzero()
+	lane1_y = np.array(nonzero_lane1[0])
+	lane1_x = np.array(nonzero_lane1[1])
+
+	nonzero_lane2 = lane2.nonzero()
+	lane2_y = np.array(nonzero_lane2[0])
+	lane2_x = np.array(nonzero_lane2[1])
+
+	try:
+		lane1_fit = np.polyfit(lane1_y, lane1_x, 2)
+	####
+	except TypeError:
+		print("Unable to detect lane 1")
+	try:
+		lane2_fit = np.polyfit(lane2_y, lane2_x, 2)
+	####
+	except TypeError:
+		print("Unable to detect lanes 2")
+
+	
+	# find waypoints
+	ploty = np.linspace(0, labeled_lanes.shape[0]-1, num_points)
+	lane1_fitx = lane1_fit[0]*ploty**2 + lane1_fit[1]*ploty + lane1_fit[2]
+	lane2_fitx = lane2_fit[0]*ploty**2 + lane2_fit[1]*ploty + lane2_fit[2]
+	mid_fitx = (lane1_fitx + lane2_fitx)/2.
+	mid_line_pts = np.array([np.transpose(np.vstack([mid_fitx, ploty]))])[0]
+
+	return mid_line_pts
+
+
+
