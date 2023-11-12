@@ -410,7 +410,11 @@ def main():
     print("start : ", start)
     print("goal : ", goal)
 
+    map = plt.imread("gnss_map.png")
+    print(map)
+
     if show_animation:
+        # plt.imshow(map)
         plt.plot(ox, oy, ".k")
         rs.plot_arrow(start[0], start[1], start[2], fc='g')
         rs.plot_arrow(goal[0], goal[1], goal[2])
@@ -428,6 +432,7 @@ def main():
     if show_animation:
         for i_x, i_y, i_yaw in zip(x, y, yaw):
             plt.cla()
+            # plt.imshow(map)
             plt.plot(ox, oy, ".k")
             plt.plot(x, y, "-r", label="Hybrid A* path")
             plt.grid(True)
@@ -435,7 +440,7 @@ def main():
             plot_car(i_x, i_y, i_yaw)
             plt.pause(0.0001)
 
-    print(__file__ + " done!!")
+    print(__file__ + " done")
 
 
 if __name__ == '__main__':
