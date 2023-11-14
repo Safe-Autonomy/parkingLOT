@@ -46,6 +46,7 @@ class LaneDetector():
             self.cameraSub = rospy.Subscriber(image_topic, Image, self.image_handler, queue_size=1)
             self.laneDetPub = rospy.Publisher("lane_detection/image", Image, queue_size=1)
             self.bridge = CvBridge()
+            self.centerlinePub = rospy.Publisher("lane_detection/centerline_points", centerline_points, queue_size=1) #probly wrong
 
         # ------------- YOLOPv2 Init-------------
         # Load model
@@ -177,6 +178,8 @@ class LaneDetector():
         combine_fit_img = final_viz(camera_img, mid_line_pts, Minv)
         # cv2.imwrite('visualization/combine_fit_img.png',combine_fit_img)
         # cv2.imwrite('visualization/birdeye_fit_img.png',birdeye_fit_img)
+
+        self.laneDetPub.publish(mid_line_pts) #probly wrong
 
         return combine_fit_img, birdeye_fit_img 
         
