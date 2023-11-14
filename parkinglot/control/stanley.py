@@ -26,7 +26,7 @@ import scipy.signal as signal
 import rospy
 import alvinxy.alvinxy as axy 
 from ackermann_msgs.msg import AckermannDrive
-from std_msgs.msg import String, Bool, Float32, Float64
+from std_msgs.msg import String, Bool, Float32, Float64, Float32MultiArray
 from novatel_gps_msgs.msg import NovatelPosition, NovatelXYZ, Inspva
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
@@ -269,8 +269,8 @@ class Global_Stanley(object):
 
             # find the closest point - closest point is the first point in the list
             # target_num = 2
-            # dx = [curr_x - x for x in self.target_path_points_x]
-            # dy = [curr_y - y for y in self.target_path_points_y]
+            dx = [curr_x - x for x in self.target_path_points_x]
+            dy = [curr_y - y for y in self.target_path_points_y]
 
             # find the index of target point - choose whatever point we want
             target_point_idx = int(np.argmin(np.hypot(dx, dy)))
@@ -365,6 +365,8 @@ class Local_Stanley(object):
         self.speed      = 0.0
 
         self.stanley_pub = rospy.Publisher('/gem/stanley_gnss_cmd', AckermannDrive, queue_size=1)
+
+        self.centerline_sub = rospy.Subscriber("lane_detection/centerline_points", Float32MultiArray, self.read_waypoints, queue_size=1)
 
         self.ackermann_msg                         = AckermannDrive()
         self.ackermann_msg.steering_angle_velocity = 0.0

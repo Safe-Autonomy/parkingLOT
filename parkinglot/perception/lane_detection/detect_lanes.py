@@ -32,6 +32,7 @@ from utils.misc import Line, perspective_transform
 import rospy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
+from std_msgs.msg import Float32MultiArray
 from parkinglot.topics import SIM_CAMERA_TOPIC, GEM_CAMERA_TOPIC
 
 class LaneDetector():
@@ -46,7 +47,7 @@ class LaneDetector():
             self.cameraSub = rospy.Subscriber(image_topic, Image, self.image_handler, queue_size=1)
             self.laneDetPub = rospy.Publisher("lane_detection/image", Image, queue_size=1)
             self.bridge = CvBridge()
-            self.centerlinePub = rospy.Publisher("lane_detection/centerline_points", centerline_points, queue_size=1) #probly wrong
+            self.centerlinePub = rospy.Publisher("lane_detection/centerline_points", Float32MultiArray, queue_size=1) 
 
         # ------------- YOLOPv2 Init-------------
         # Load model
@@ -77,7 +78,7 @@ class LaneDetector():
             print(e)
 
         # run detection
-        combine_fit_img, bird_fit_img = self.detect_lane_pipeline(cv_image.copy(),apply_obj_det=False)
+        combine_fit_img, bird_fit_img ,mid_line_pts= self.detect_lane_pipeline(cv_image.copy(),apply_obj_det=False)
         if combine_fit_img is not None:
             # Convert an OpenCV image into a ROS image message
             out_img_msg = self.bridge.cv2_to_imgmsg(combine_fit_img, 'bgr8')
@@ -86,6 +87,7 @@ class LaneDetector():
             # Publish image message in ROS
             self.laneDetPub.publish(out_img_msg)
             self.laneDetPub.publish(out_birdeye_msg)
+            self.centerlinePub.publish(mid_line_pts)
 
     # ------- These 2 functions belowed are modified from YOLOPv2 utils -------
     def lane_line_mask(self, ll = None):
@@ -181,7 +183,7 @@ class LaneDetector():
 
         self.laneDetPub.publish(mid_line_pts) #probly wrong
 
-        return combine_fit_img, birdeye_fit_img 
+        return combine_fit_img, birdeye_fit_img, mid_line_pts
         
     def detect_lane_pipeline(self, camera_img, apply_obj_det=False, visualize=False):
 
@@ -201,13 +203,13 @@ class LaneDetector():
             cv2.imwrite('./visualization/lane_mask.png',lane_mask*255)
 
         # extract waypoints from lane mask
-        combine_fit_img, bird_fit_img = self.extract_waypoints(camera_img,lane_mask)   # mid_line_pts (N,2)
+        combine_fit_img, bird_fit_img,mid_line_pts = self.extract_waypoints(camera_img,lane_mask)   # mid_line_pts (N,2)
         
         if visualize:
             cv2.imwrite('./visualization/combine_fit.png',combine_fit_img)
             cv2.imwrite('./visualization/bird_fit.png',bird_fit_img)
 
-        return combine_fit_img, bird_fit_img
+        return combine_fit_img, bird_fit_img, mid_line_pts
     
 
 def detect_lanes():
