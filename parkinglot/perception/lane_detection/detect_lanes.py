@@ -119,10 +119,12 @@ class LaneDetector():
 
         # -------- Inference ---------
         t1 = time_synchronized()
-        [pred,anchor_grid],seg,ll= self.model(img)
+        with torch.no_grad():
+            [pred,anchor_grid],seg,ll= self.model(img)
+            torch.cuda.empty_cache()
         t2 = time_synchronized()
-        torch.cuda.empty_cache()
 
+        # ------ pre-processing -------
         # waste time: the incompatibility of  torch.jit.trace causes extra time consumption in demo version 
         # but this problem will not appear in offical version 
         pred = split_for_trace_model(pred,anchor_grid)
