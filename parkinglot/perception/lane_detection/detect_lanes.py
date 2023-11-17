@@ -119,7 +119,8 @@ class LaneDetector():
         t1 = time_synchronized()
         [pred,anchor_grid],seg,ll= self.model(img)
         t2 = time_synchronized()
-        torch.cuda.empty_cache()
+        with torch.no_grad():
+            torch.cuda.empty_cache()
 
         # waste time: the incompatibility of  torch.jit.trace causes extra time consumption in demo version 
         # but this problem will not appear in offical version 
