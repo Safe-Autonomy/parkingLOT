@@ -33,6 +33,8 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 # GEM PACMod Headers
 from pacmod_msgs.msg import PositionWithSpeed, PacmodCmd, SystemRptFloat, VehicleSpeedRpt
 
+# 
+
 
 class OnlineFilter(object):
 
@@ -591,8 +593,8 @@ class Local_Stanley(object):
 
 def stanley_run():
 
-    rospy.init_node('gnss_stanley_node', anonymous=True)
-    stanley = Stanley()
+    rospy.init_node('local_planner', anonymous=True)
+    stanley = Local_Stanley()
 
     try:
         stanley.start_stanley()

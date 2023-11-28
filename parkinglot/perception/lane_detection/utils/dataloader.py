@@ -4,12 +4,13 @@ import cv2
 import numpy as np
 
 class LoadImage:  # for inference
-    def __init__(self, img, img_size=640, stride=32):
+    def __init__(self, img, img_size=640, stride=32, keep_same_dim=False):
 
         self.img_size = img_size
         self.stride = stride
         self.img = img
         self.nf = 1  # number of frames
+        self.keep_same_dim = keep_same_dim 
 
     def __iter__(self):
         self.count = 0
@@ -26,7 +27,8 @@ class LoadImage:  # for inference
         #print(f'image {self.count}/{self.nf} {path}: ', end='')
 
         # Padded resize
-        img0 = cv2.resize(img0, (1280,720), interpolation=cv2.INTER_LINEAR)
+        if not self.keep_same_dim:
+            img0 = cv2.resize(img0, (1280, 720), interpolation=cv2.INTER_LINEAR)
         img = letterbox(img0, self.img_size, stride=self.stride)[0]
 
         # Convert

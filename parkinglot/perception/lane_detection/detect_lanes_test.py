@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-import os
 import time
 import cv2
 import torch
 import numpy as np
+import argparse
 import matplotlib.pyplot as plt
 from skimage import morphology
 from scipy import ndimage
@@ -15,35 +15,29 @@ from utils.dataloader import LoadImage
 from utils.line_fit import bird_viz, final_viz, fit_one_lane, fit_two_lane
 from utils.misc import Line, perspective_transform
 
+# from parkinglot.topics import SIM_CAMERA_TOPIC, GEM_CAMERA_TOPIC
+
 import rospy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import Float32MultiArray
 from parkinglot.topics import SIM_CAMERA_TOPIC, GEM_CAMERA_TOPIC
 
-
-FLAG_GAZEBO = False
-
 class LaneDetector():
-    def __init__(self, device=None, enable_ros=True) -> None:
+    def __init__(self, image_topic: str, device=None, enable_ros=True) -> None:
 
         # ------------- Rospy Init-------------
         if enable_ros:
 
-            image_topic = GEM_CAMERA_TOPIC if not FLAG_GAZEBO else SIM_CAMERA_TOPIC
-            
             # init ros node
-            self.bridge = CvBridge()
             self.cameraSub = rospy.Subscriber(image_topic, Image, self.image_handler, queue_size=1)
-
             self.laneDetPub = rospy.Publisher("lane_detection/image", Image, queue_size=1)
-            self.laneDetBEVPub = rospy.Publisher("lane_detection/bev_image", Image, queue_size=1)
+            self.bridge = CvBridge()
             self.centerlinePub = rospy.Publisher("lane_detection/centerline_points", Float32MultiArray, queue_size=1) 
 
         # ------------- YOLOPv2 Init-------------
         # Load model
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        weights = os.path.join(dir_path, 'YOLOPv2/data/weights/yolopv2.pt')   # local relative path
+        weights = './YOLOPv2/data/weights/yolopv2.pt'   # local relative path
 
         self.device = device
         self.model = torch.jit.load(weights).to(device=self.device)
@@ -69,7 +63,6 @@ class LaneDetector():
 
         # run detection
         combine_fit_img, bird_fit_img ,mid_line_pts= self.detect_lane_pipeline(cv_image.copy(),apply_obj_det=False)
-
         if combine_fit_img is not None:
             # Convert an OpenCV image into a ROS image message
             out_img_msg = self.bridge.cv2_to_imgmsg(combine_fit_img, 'bgr8')
@@ -77,7 +70,7 @@ class LaneDetector():
 
             # Publish image message in ROS
             self.laneDetPub.publish(out_img_msg)
-            self.laneDetBEVPub.publish(out_birdeye_msg)
+            self.laneDetPub.publish(out_birdeye_msg)
             self.centerlinePub.publish(mid_line_pts)
 
     # ------- These 2 functions belowed are modified from YOLOPv2 utils -------
@@ -94,7 +87,7 @@ class LaneDetector():
         nms_time = AverageMeter()
 
         # ------ pre-processing -------
-        data_img = LoadImage(img, img_size=640, stride=32, keep_same_dim=FLAG_GAZEBO) # only keep same dim in sim
+        data_img = LoadImage(img, img_size=640, stride=32)
         iter_data_img = iter(data_img)
 
         
@@ -125,9 +118,7 @@ class LaneDetector():
         pred = non_max_suppression(pred, conf_thres, iou_thres, classes=0, agnostic=agnostic_nms)
         t4 = time_synchronized()
 
-        # ll_seg_mask = lane_line_mask(ll)
-        ll_seg_mask = torch.round(ll).squeeze(1)
-        ll_seg_mask = ll_seg_mask.int().squeeze().cpu().numpy()
+        ll_seg_mask = lane_line_mask(ll)
 
         if apply_obj_det:
             # Process detections
@@ -158,7 +149,7 @@ class LaneDetector():
 
         # Perspective Transform
         img_birdeye, M, Minv = perspective_transform(lane_mask)
-
+        # cv2.imwrite('./visualization/birdeye.png',img_birdeye*255)
         # find numer of lanes
         labeled_lanes, num_lanes = ndimage.label(img_birdeye)
         print("numer of lanes:", num_lanes)
@@ -169,9 +160,14 @@ class LaneDetector():
         elif num_lanes == 2:
             mid_line_pts = fit_two_lane(labeled_lanes)
 
+        
         # print(mid_line_pts)
         birdeye_fit_img = bird_viz(img_birdeye, mid_line_pts)
         combine_fit_img = final_viz(camera_img, mid_line_pts, Minv)
+        # cv2.imwrite('visualization/combine_fit_img.png',combine_fit_img)
+        # cv2.imwrite('visualization/birdeye_fit_img.png',birdeye_fit_img)
+
+        self.laneDetPub.publish(mid_line_pts) #probly wrong
 
         return combine_fit_img, birdeye_fit_img, mid_line_pts
         
@@ -186,6 +182,7 @@ class LaneDetector():
         raw_lane_mask[(ll_seg_mask == 1) & (color_thresh_mask == 1)] = 1
         
         raw_lane_mask = morphology.remove_small_objects(raw_lane_mask.astype('bool'),min_size=400,connectivity=2)
+
         lane_mask = cv2.GaussianBlur(raw_lane_mask.astype(np.float32),(9,9),0)
         
         if visualize:
@@ -200,22 +197,43 @@ class LaneDetector():
 
         return combine_fit_img, bird_fit_img, mid_line_pts
     
+
 def detect_lanes():
     # init args
     rospy.init_node('detect_lanes', anonymous=True)
 
     # perception
-    LaneDetector(device=torch.device('cuda:0'), enable_ros=True)
+    camera_topic = GEM_CAMERA_TOPIC
+    LaneDetector(image_topic=camera_topic, device=torch.device('cuda:1'), enable_ros=True)
     
     while not rospy.core.is_shutdown():
         rospy.rostime.wallsleep(0.5)
 
+# NOTE: Scripts below are for GEM testing
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Arguments for lane following')
+    # parser.add_argument('--gem', action=argparse.BooleanOptionalAction, help='Add this flag to run on vehicle')
+    # args = parser.parse_args()
 
     try:
         detect_lanes()
     except rospy.exceptions.ROSInterruptException:
         rospy.loginfo("Shutting down")
     
+# NOTE: Scripts below are for testing purpose only (will be removed after perception done)
+if __name__ == '__main__':
+    # rospy.init_node('lane_detector', anonymous=True)
+    # image_topic = rospy.get_param('~image_topic', '/camera/color/image_raw')
+    # device = rospy.get_param('~device', '0')
+    # lane_detector = LaneDetector(image_topic, device)
+    # rospy.spin()
+
+    # img = cv2.imread('/home/gem/Documents/gem_01/src/parkingLOT/parkinglot/perception/YOLOPv2/data/samples/1.jpg')
+    # img = cv2.imread('/home/ziruiw3/ece484fa23/parkingLOT/parkinglot/perception/lane_detection/data/50.png')
+    img = cv2.imread('data/150.png')
+    lane_detector = LaneDetector(image_topic=None, device=torch.device('cuda:0'), enable_ros = False)
+    count = 1
+    for i in range(count):
+        lane_detector.detect_lane_pipeline(img, apply_obj_det=False, visualize=True)
         
     
