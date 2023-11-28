@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node name="local_planner" pkg="control" type="local_stanley.py" />
+  
+  <node name="lane_detection" pkg="lane_detection" type="detect_lanes.py" />
+  
+</launch>
+
+
+
+
+
+
+
