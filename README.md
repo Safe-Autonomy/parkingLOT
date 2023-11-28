@@ -6,34 +6,44 @@ Parking is hard for human, so why don't we build a robot that does parking for u
 
 ### Install:
 
+Clone the repo recursively to a catkin workspace (named `GEM-01` for our case):
+
 ```
+cd GEM-01/src
 git clone --recursive-submodules https://github.com/Safe-Autonomy/parkingLOT.git
 cd parkingLOT/
 pip install -v -e .
 ```
 
+Build it!
+
+```
+cd .. # make sure to be in the src/ folder, not sure if needed
+catkin build
+```
+
+Make sure to download the pre-trained YoloPv2 weights from their git repo into `YOLOPv2/data/weights`
+
 ### Usage: 
 
-Clone this repo into `vehicle_drivers` and either the [hardware_drivers](https://github.com/Safe-Autonomy/hardware-drivers) or the [simulator](https://github.com/Safe-Autonomy/simulator) repo depends on use cases. 
+#### Real-world GEM Vehicle
 
-For real-world hardware drivers run, run these (on separate terminals, make sure to first `source devel/setup.bash` in each)
+Run these (on separate terminals, make sure to first `source devel/setup.bash` in each)
 
 ```
 roslaunch basic_launch sensor_init.launch
 roslaunch basic_launch visualization.launch
 ```
 
-For simulators run, run these (on separate terminals, make sure to first `source devel/setup.bash` in each)
-
-```
-roslaunch gem_launch gem_init.launch world_name:="highbay_track.world" x:=-1.5 y:=-21 yaw:=3.1416
-```
-
 On another terminal, run `parkingLOT`:
 
 ```
-python runner/lane_following.py [--gem]
+roslaunch basic_launch lane_following.launch
 ```
+
+#### Gazebo Simulation 
+
+TODO
 
 ### Credit:
 
