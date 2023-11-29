@@ -363,10 +363,10 @@ def get_final_path(closed, goal_node):
 
 def verify_index(node, c):
     x_ind, y_ind = node.x_index, node.y_index
-    if c.min_x <= x_ind <= c.max_x and c.min_y <= y_ind <= c.max_y:
-        return True
+    return c.min_x <= x_ind <= c.max_x and c.min_y <= y_ind <= c.max_y:
+    #     return True
 
-    return False
+    # return False
 
 
 def calc_index(node, c):
