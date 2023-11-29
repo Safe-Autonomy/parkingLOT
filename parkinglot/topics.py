@@ -1,4 +1,6 @@
 
+FLAG_GAZEBO = False
+
 # ---- GEM ----
 GEM_CAMERA_TOPIC = '/zed2/zed_node/rgb/image_rect_color'
 

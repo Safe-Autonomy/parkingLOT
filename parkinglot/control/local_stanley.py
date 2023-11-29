@@ -23,8 +23,10 @@ import rospy
 from ackermann_msgs.msg import AckermannDrive
 from std_msgs.msg import Float32MultiArray
 
-# GEM PACMod Headers
-from pacmod_msgs.msg import SystemRptFloat, VehicleSpeedRpt
+from parkinglot.topics import *
+
+if not FLAG_GAZEBO:
+    from pacmod_msgs.msg import SystemRptFloat, VehicleSpeedRpt
 
 class OnlineFilter(object):
 
@@ -106,13 +108,14 @@ class Local_Stanley(object):
         self.speed_filter  = OnlineFilter(1.2, 30, 4)
 
         ######### SUBSCRIBERS ######### 
-        # Speed from GEM
-        self.speed_sub  = rospy.Subscriber("/pacmod/parsed_tx/vehicle_speed_rpt", VehicleSpeedRpt, self.speed_callback)
-        self.speed      = 0.0
+        if not FLAG_GAZEBO:
+            # Speed from GEM
+            self.speed_sub  = rospy.Subscriber("/pacmod/parsed_tx/vehicle_speed_rpt", VehicleSpeedRpt, self.speed_callback)
+            self.speed      = 0.0
 
-        # steering from GEM
-        self.steer_sub = rospy.Subscriber("/pacmod/parsed_tx/steer_rpt", SystemRptFloat, self.steer_callback)
-        self.steer = 0.0 # degrees
+            # steering from GEM
+            self.steer_sub = rospy.Subscriber("/pacmod/parsed_tx/steer_rpt", SystemRptFloat, self.steer_callback)
+            self.steer = 0.0 # degrees
 
         # local waypoints from percception
         self.centerline_sub = rospy.Subscriber("lane_detection/centerline_points", Float32MultiArray, self.read_waypoints, queue_size=1)

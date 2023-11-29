@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from skimage import morphology
 from scipy import ndimage
 
+from parkinglot.topics import *
+
 from YOLOPv2.utils.utils import *
 
 from utils.dataloader import LoadImage
@@ -19,10 +21,6 @@ import rospy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import Float32MultiArray
-from parkinglot.topics import SIM_CAMERA_TOPIC, GEM_CAMERA_TOPIC
-
-
-FLAG_GAZEBO = False
 
 class LaneDetector():
     def __init__(self, device=None, enable_ros=True) -> None:
@@ -97,9 +95,10 @@ class LaneDetector():
         nms_time = AverageMeter()
 
         # ------ pre-processing -------
-        data_img = LoadImage(img, img_size=640, stride=32, keep_same_dim=FLAG_GAZEBO) # only keep same dim in sim
+        if FLAG_GAZEBO:
+            img = cv2.resize(img, (1280, 720), interpolation=cv2.INTER_LINEAR)
+        data_img = LoadImage(img, img_size=640, stride=32) # only keep same dim in sim
         iter_data_img = iter(data_img)
-
         
         t0 = time.time()
         
@@ -129,8 +128,6 @@ class LaneDetector():
         t4 = time_synchronized()
 
         ll_seg_mask = lane_line_mask(ll)
-        # ll_seg_mask = torch.round(ll).squeeze(1)
-        # ll_seg_mask = ll_seg_mask.int().squeeze().cpu().numpy()
 
         if apply_obj_det:
             # Process detections
@@ -144,7 +141,8 @@ class LaneDetector():
 
         return ll_seg_mask
         # return (ll_seg_mask*255).astype(np.uint8)
-        # def detect_lanes_color(self, img, thresh_l=(190, 255)):
+
+    # def detect_lanes_color(self, img, thresh_l=(190, 255)):
     def detect_lanes_color(self, img, thresh_l=(80, 255)):
         # NOTE: orig prams (190, 255)
         # NOTE: bright light condition params: (80-100, 255)
@@ -175,7 +173,6 @@ class LaneDetector():
             mid_line_pts = fit_two_lane(labeled_lanes)
         else:
             mid_line_pts = np.array([[0,0]])
-        
         
         mid_line_pts -= (img_birdeye.shape[0] // 2, 0)
 
