@@ -128,7 +128,9 @@ class Local_Stanley(object):
         self.ackermann_msg.speed                   = 0.0 
         self.ackermann_msg.steering_angle          = 0.0
 
-       
+        self.path_points_lon_x = None
+        self.path_points_lat_y = None
+        self.path_points_heading = None
 
     # Get vehicle speed
     def speed_callback(self, msg):
@@ -145,10 +147,15 @@ class Local_Stanley(object):
 
     # Get predefined waypoints based on local planner(perception)
     def read_waypoints(self, path_points):
+        print("A")
+        path_points = np.asarray(path_points.data).reshape(-1, 2)
+        print(path_points.shape)
+        if not path_points:
+            print("no waypoints detected")
         # x towards East and y towards North
-        self.path_points_lon_x   = [float(point[0]) for point in path_points] # longitude
-        self.path_points_lat_y   = [float(point[1]) for point in path_points] # latitude
-        self.path_points_heading = [float(point[2]) for point in path_points] # heading
+        self.path_points_lon_x   = path_points[0,:] # longitude
+        self.path_points_lat_y   = path_points[1,:] # latitude
+        # self.path_points_heading = [float(point[2]) for point in path_points] # heading
 
     # Conversion of front wheel to steering wheel
     def front2steer(self, f_angle):
@@ -205,6 +212,8 @@ class Local_Stanley(object):
     def start_stanley(self):
         
         while not rospy.is_shutdown():
+            if self.path_points_lon_x is None:
+                continue
 
             self.path_points_x   = np.array(self.path_points_lon_x)
             self.path_points_y   = np.array(self.path_points_lat_y)

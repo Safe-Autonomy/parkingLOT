@@ -75,10 +75,13 @@ class LaneDetector():
             out_img_msg = self.bridge.cv2_to_imgmsg(combine_fit_img, 'bgr8')
             out_birdeye_msg = self.bridge.cv2_to_imgmsg(bird_fit_img,'bgr8')
 
+            array = Float32MultiArray()
+            array.data = mid_line_pts.flatten().tolist()
+
             # Publish image message in ROS
             self.laneDetPub.publish(out_img_msg)
             self.laneDetBEVPub.publish(out_birdeye_msg)
-            self.centerlinePub.publish(mid_line_pts)
+            self.centerlinePub.publish(array)
 
     # ------- These 2 functions belowed are modified from YOLOPv2 utils -------
     def lane_line_mask(self, ll = None):
@@ -125,9 +128,9 @@ class LaneDetector():
         pred = non_max_suppression(pred, conf_thres, iou_thres, classes=0, agnostic=agnostic_nms)
         t4 = time_synchronized()
 
-        # ll_seg_mask = lane_line_mask(ll)
-        ll_seg_mask = torch.round(ll).squeeze(1)
-        ll_seg_mask = ll_seg_mask.int().squeeze().cpu().numpy()
+        ll_seg_mask = lane_line_mask(ll)
+        # ll_seg_mask = torch.round(ll).squeeze(1)
+        # ll_seg_mask = ll_seg_mask.int().squeeze().cpu().numpy()
 
         if apply_obj_det:
             # Process detections
@@ -141,8 +144,10 @@ class LaneDetector():
 
         return ll_seg_mask
         # return (ll_seg_mask*255).astype(np.uint8)
-        
-    def detect_lanes_color(self, img, thresh_l=(190, 255)):
+        # def detect_lanes_color(self, img, thresh_l=(190, 255)):
+    def detect_lanes_color(self, img, thresh_l=(80, 255)):
+        # NOTE: orig prams (190, 255)
+        # NOTE: bright light condition params: (80-100, 255)
         """
         Convert RGB to LUV and HSV color space and apply threshold for white lane
         """
@@ -168,6 +173,11 @@ class LaneDetector():
             mid_line_pts = fit_one_lane(labeled_lanes)
         elif num_lanes == 2:
             mid_line_pts = fit_two_lane(labeled_lanes)
+        else:
+            mid_line_pts = np.array([[0,0]])
+        
+        
+        mid_line_pts -= (img_birdeye.shape[0] // 2, 0)
 
         # print(mid_line_pts)
         birdeye_fit_img = bird_viz(img_birdeye, mid_line_pts)

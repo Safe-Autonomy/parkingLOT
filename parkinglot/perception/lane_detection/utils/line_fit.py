@@ -13,6 +13,7 @@ def bird_viz(binary_warped, mid_line_pts, save_file=None):
 	Visualize the predicted lane lines with margin, on binary warped image
 	save_file is a string representing where to save the image (if None, then just display)
 	"""
+	mid_line_pts += (binary_warped.shape[0] // 2, 0)
 
 	# Create an image to draw on and an image to show the selection window
 	out_img = (np.dstack((binary_warped, binary_warped, binary_warped))*255).astype('uint8')
