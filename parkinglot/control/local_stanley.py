@@ -16,6 +16,7 @@ from __future__ import print_function
 
 # Python Headers
 import numpy as np
+import math
 import scipy.signal as signal
 
 # ROS Headers
@@ -26,7 +27,10 @@ from std_msgs.msg import Float32MultiArray
 from parkinglot.topics import *
 
 if not FLAG_GAZEBO:
-    from pacmod_msgs.msg import SystemRptFloat, VehicleSpeedRpt
+    from pacmod_msgs.msg import VehicleSpeedRpt
+else:
+    from gazebo_msgs.srv import GetModelState, GetModelStateResponse
+    from gazebo_msgs.msg import ModelState
 
 class OnlineFilter(object):
 
@@ -111,18 +115,15 @@ class Local_Stanley(object):
         if not FLAG_GAZEBO:
             # Speed from GEM
             self.speed_sub  = rospy.Subscriber("/pacmod/parsed_tx/vehicle_speed_rpt", VehicleSpeedRpt, self.speed_callback)
-            self.speed      = 0.0
-
-            # steering from GEM
-            self.steer_sub = rospy.Subscriber("/pacmod/parsed_tx/steer_rpt", SystemRptFloat, self.steer_callback)
-            self.steer = 0.0 # degrees
+        self.speed      = 0.0
 
         # local waypoints from percception
         self.centerline_sub = rospy.Subscriber("lane_detection/centerline_points", Float32MultiArray, self.read_waypoints, queue_size=1)
 
         ######### PUBLISHERS ######### 
         # control 
-        self.stanley_pub = rospy.Publisher('/gem/stanley_gnss_cmd', AckermannDrive, queue_size=1)
+        control_topic = GEM_CONTROL_TOPC if not FLAG_GAZEBO else SIM_CONTROL_TOPIC
+        self.stanley_pub = rospy.Publisher(control_topic, AckermannDrive, queue_size=1)
 
         self.ackermann_msg                         = AckermannDrive()
         self.ackermann_msg.steering_angle_velocity = 0.0
@@ -150,15 +151,13 @@ class Local_Stanley(object):
 
     # Get predefined waypoints based on local planner(perception)
     def read_waypoints(self, path_points):
-        print("A")
         path_points = np.asarray(path_points.data).reshape(-1, 2)
-        print(path_points.shape)
-        if not path_points:
+        if len(path_points) <= 1:
             print("no waypoints detected")
         # x towards East and y towards North
         self.path_points_lon_x   = path_points[0,:] # longitude
         self.path_points_lat_y   = path_points[1,:] # latitude
-        # self.path_points_heading = [float(point[2]) for point in path_points] # heading
+        self.path_points_heading = self.path_points_lat_y                                                                                                                                                                                                                                                                                                     # heading
 
     # Conversion of front wheel to steering wheel
     def front2steer(self, f_angle):
@@ -175,11 +174,36 @@ class Local_Stanley(object):
             steer_angle = 0.0
         return steer_angle
 
+    # for GAZEBO ONLY
+    def get_gem_gazebo_speed(self):
+        # Get the current state of the vehicle
+        # Input: None
+        # Output: ModelState, the state of the vehicle, contain the
+        #   position, orientation, linear velocity, angular velocity
+        #   of the vehicle
+        rospy.wait_for_service('/gazebo/get_model_state')
+        try:
+            serviceResponse = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
+            resp = serviceResponse(model_name='gem')
+        except rospy.ServiceException as exc:
+            rospy.loginfo("Service did not process request: "+str(exc))
+            resp = GetModelStateResponse()
+            resp.success = False
+
+        
+        return resp
 
     # Get vehicle states: x, y, yaw
     def get_gem_state(self):
 
         # needs to define all of these shit in local frame
+        if FLAG_GAZEBO:
+            state = self.get_gem_gazebo_speed()
+
+            if state.success:
+                twist = state.twist
+                self.speed = math.sqrt(twist.linear.x ** 2 + twist.linear.y ** 2)
+
 
         # vehicle gnss heading (yaw) in degrees
         # vehicle x, y position in fixed local frame, in meters
@@ -227,13 +251,13 @@ class Local_Stanley(object):
 
             print("[DEBUG] GEM X,Y,Yaw: ", curr_x, curr_y, curr_yaw)
 
-            target_idx = self.find_close_yaw(self.path_points_yaw, curr_yaw)
+            target_idx = 0 #self.find_close_yaw(self.path_points_yaw, curr_yaw)
 
             # print("Target list", target_idx)
 
-            self.target_path_points_x   = self.path_points_x[target_idx]
-            self.target_path_points_y   = self.path_points_y[target_idx]
-            self.target_path_points_yaw = self.path_points_yaw[target_idx]
+            self.target_path_points_x   = self.path_points_x
+            self.target_path_points_y   = self.path_points_y
+            self.target_path_points_yaw = self.path_points_yaw
 
             # find the closest point
             dx = [curr_x - x for x in self.target_path_points_x]
@@ -294,11 +318,11 @@ class Local_Stanley(object):
             if (filt_vel < 0.2):
                 self.ackermann_msg.acceleration   = throttle_percent
                 self.ackermann_msg.steering_angle = 0
-                print(self.ackermann_msg.steering_angle)
+                print(self.ackermann_msg.acceleration, self.ackermann_msg.steering_angle)
             else:
                 self.ackermann_msg.acceleration   = throttle_percent
                 self.ackermann_msg.steering_angle = round(steering_angle,1)
-                print(self.ackermann_msg.steering_angle)
+                print(self.ackermann_msg.acceleration, self.ackermann_msg.steering_angle)
 
             # ------------------------------------------------------------------------------------------------ 
 

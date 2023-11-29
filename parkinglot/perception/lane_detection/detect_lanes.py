@@ -66,7 +66,9 @@ class LaneDetector():
             print(e)
 
         # run detection
-        combine_fit_img, bird_fit_img ,mid_line_pts= self.detect_lane_pipeline(cv_image.copy(),apply_obj_det=False)
+        if FLAG_GAZEBO:
+            cv_image = cv2.resize(cv_image, (1280, 720), interpolation=cv2.INTER_LINEAR)
+        combine_fit_img, bird_fit_img ,mid_line_pts= self.detect_lane_pipeline(cv_image,apply_obj_det=False)
 
         if combine_fit_img is not None:
             # Convert an OpenCV image into a ROS image message
@@ -95,8 +97,6 @@ class LaneDetector():
         nms_time = AverageMeter()
 
         # ------ pre-processing -------
-        if FLAG_GAZEBO:
-            img = cv2.resize(img, (1280, 720), interpolation=cv2.INTER_LINEAR)
         data_img = LoadImage(img, img_size=640, stride=32) # only keep same dim in sim
         iter_data_img = iter(data_img)
         
@@ -136,8 +136,8 @@ class LaneDetector():
 
         inf_time.update(t2-t1,img.size(0))
         nms_time.update(t4-t3,img.size(0))
-        print('inf : (%.4fs/frame)   nms : (%.4fs/frame)' % (inf_time.avg,nms_time.avg))
-        print(f'Done. ({time.time() - t0:.3f}s)')
+        # print('inf : (%.4fs/frame)   nms : (%.4fs/frame)' % (inf_time.avg,nms_time.avg))
+        # print(f'Done. ({time.time() - t0:.3f}s)')
 
         return ll_seg_mask
         # return (ll_seg_mask*255).astype(np.uint8)
