@@ -21,9 +21,9 @@ import reeds_shepp as rs
 # from reeds_shepp import plot_arrow
 from car import move, check_car_collision, MAX_STEER, WB, plot_car, BUBBLE_R
 
-XY_GRID_RESOLUTION = 2.0  # [m]
+XY_GRID_RESOLUTION = 4.0  # [m]
 YAW_GRID_RESOLUTION = np.deg2rad(15.0)  # [rad]
-MOTION_RESOLUTION = 0.1  # [m] path interpolate resolution
+MOTION_RESOLUTION = 4  # [m] path interpolate resolution
 N_STEER = 20  # number of steer command
 
 SB_COST = 100.0  # switch back penalty cost
@@ -363,10 +363,9 @@ def get_final_path(closed, goal_node):
 
 def verify_index(node, c):
     x_ind, y_ind = node.x_index, node.y_index
-    return c.min_x <= x_ind <= c.max_x and c.min_y <= y_ind <= c.max_y:
-    #     return True
-
-    # return False
+    if c.min_x <= x_ind <= c.max_x and c.min_y <= y_ind <= c.max_y:
+        return True
+    return False
 
 
 def calc_index(node, c):
@@ -384,28 +383,28 @@ def main():
 
     ox, oy = [], []
 
-    for i in range(60):
+    for i in range(500, 780):
         ox.append(i)
-        oy.append(0.0)
-    for i in range(60):
-        ox.append(60.0)
-        oy.append(i)
-    for i in range(61):
-        ox.append(i)
-        oy.append(60.0)
-    for i in range(61):
-        ox.append(0.0)
-        oy.append(i)
-    for i in range(40):
-        ox.append(20.0)
-        oy.append(i)
-    for i in range(40):
-        ox.append(40.0)
-        oy.append(60.0 - i)
+        oy.append(1200.0)
+    # for i in range(2100):
+    #     ox.append(2100.0)
+    #     oy.append(i)
+    # for i in range(2100):
+    #     ox.append(i)
+    #     oy.append(2100.0)
+    # for i in range(2100):
+    #     ox.append(0.0)
+    #     oy.append(i)
+    # for i in range(2100):
+    #     ox.append(1500.0)
+    #     oy.append(i)
+    # for i in range(2100):
+    #     ox.append(1500.0)
+    #     oy.append(2100 - i)
 
     # Set Initial parameters
-    start = [10.0, 10.0, np.deg2rad(90.0)]
-    goal = [50.0, 50.0, np.deg2rad(-90.0)]
+    start = [492.0, 1123.0, np.deg2rad(0)]
+    goal = [903.0, 1240.0, np.deg2rad(60)]
 
     print("start : ", start)
     print("goal : ", goal)
@@ -428,16 +427,18 @@ def main():
     x = path.x_list
     y = path.y_list
     yaw = path.yaw_list
-
+    frame_num = 0
     if show_animation:
         for i_x, i_y, i_yaw in zip(x, y, yaw):
             plt.cla()
-            # plt.imshow(map)
+            plt.imshow(map)
             plt.plot(ox, oy, ".k")
             plt.plot(x, y, "-r", label="Hybrid A* path")
             plt.grid(True)
             plt.axis("equal")
             plot_car(i_x, i_y, i_yaw)
+            # plt.savefig("demo_frames_jpg/hybrid_astar_demo_{}.jpg".format(frame_num))
+            frame_num += 1
             plt.pause(0.0001)
 
     print(__file__ + " done")
