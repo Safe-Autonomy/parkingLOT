@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from skimage import morphology
 from scipy import ndimage
 
-from parkinglot.topics import *
+from parkinglot.constants import *
 
 from YOLOPv2.utils.utils import *
 
@@ -27,12 +27,10 @@ class LaneDetector():
 
         # ------------- Rospy Init-------------
         if enable_ros:
-
-            image_topic = GEM_CAMERA_TOPIC if not FLAG_GAZEBO else SIM_CAMERA_TOPIC
             
             # init ros node
             self.bridge = CvBridge()
-            self.cameraSub = rospy.Subscriber(image_topic, Image, self.image_handler, queue_size=1)
+            self.cameraSub = rospy.Subscriber(CAMERA_TOPIC, Image, self.image_handler, queue_size=1)
 
             self.laneDetPub = rospy.Publisher("lane_detection/image", Image, queue_size=1)
             self.laneDetBEVPub = rospy.Publisher("lane_detection/bev_image", Image, queue_size=1)
@@ -177,8 +175,8 @@ class LaneDetector():
         mid_line_pts -= (img_birdeye.shape[0] // 2, 0)
 
         # print(mid_line_pts)
-        birdeye_fit_img = bird_viz(img_birdeye, mid_line_pts)
-        combine_fit_img = final_viz(camera_img, mid_line_pts, Minv)
+        birdeye_fit_img = bird_viz(img_birdeye, mid_line_pts.copy())
+        combine_fit_img = final_viz(camera_img, mid_line_pts.copy(), Minv)
 
         return combine_fit_img, birdeye_fit_img, mid_line_pts
         

@@ -21,7 +21,7 @@ import rospy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import Float32MultiArray
-from parkinglot.topics import SIM_CAMERA_TOPIC, GEM_CAMERA_TOPIC
+from parkinglot.constants import *
 
 class LaneDetector():
     def __init__(self, image_topic: str, device=None, enable_ros=True) -> None:

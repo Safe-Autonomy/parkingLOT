@@ -13,11 +13,17 @@ def bird_viz(binary_warped, mid_line_pts, save_file=None):
 	Visualize the predicted lane lines with margin, on binary warped image
 	save_file is a string representing where to save the image (if None, then just display)
 	"""
+
 	mid_line_pts += (binary_warped.shape[0] // 2, 0)
 
 	# Create an image to draw on and an image to show the selection window
 	out_img = (np.dstack((binary_warped, binary_warped, binary_warped))*255).astype('uint8')
 	window_img = np.zeros_like(out_img)
+
+	# cv2.line(out_img, (out_img.shape[0]//2, 0), (out_img.shape[0]//2, out_img.shape[1] - 1), (0, 0, 255), thickness = 3)
+	# cv2.line(out_img, (40, 0), (40, out_img.shape[1] - 1), (255, 0, 0), thickness = 4)
+	# cv2.line(out_img, (out_img.shape[0] - 40, 0), (out_img.shape[0] - 40, out_img.shape[1] - 1), (255, 255, 0), thickness = 4)
+
 	# Color the middle lane
 	for i in range(len(mid_line_pts)):
 		cv2.circle(out_img, (int(mid_line_pts[i][0]), int(mid_line_pts[i][1])), 5, (0,255,0), -1)
@@ -74,11 +80,11 @@ def fit_one_lane(labeled_lanes,num_points=10):
 	left_view = np.zeros_like(labeled_lanes)
 	right_view = np.zeros_like(labeled_lanes)
 
-	left_view[int(3*height/4):,:int(width/2)] = lane[int(3*height/4):,:int(width/2)]
-	right_view[int(3*height/4):,int(width/2):] = lane[int(3*height/4):,int(width/2):]  
+	left_view[int(3*height/4):,:int(3*width/4)] = lane[int(3*height/4):,:int(3*width/4)]
+	right_view[int(3*height/4):,int(3*width/4):] = lane[int(3*height/4):,int(3*width/4):]  
 
 	lane_is_right = np.sum(left_view) < np.sum(right_view)
-	offset = np.array([200, 0])
+	offset = np.array([100, 0])
 
 	nonzero_lane = lane.nonzero()
 	lane_y = np.array(nonzero_lane[0])

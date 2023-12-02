@@ -12,10 +12,18 @@ def perspective_transform(img, verbose=False):
 		[bottom-left, bottom-right, top-left, top-right]
 	"""
 
+	# original
+	# bottom_left = [0,700]
+	# bottom_right = [1280,700]
+	# top_left = [50,500]
+	# top_right = [1200,500]
+
+	#gazebo tuned
 	bottom_left = [0,700]
-	bottom_right = [1280,700]
-	top_left = [50,500]
-	top_right = [1200,500]
+	bottom_right = [1500,700]
+	top_left = [355,500]
+	top_right = [1035,500]
+
 
 	# Define 4 source points and 4 destination points
 	src = np.float32([bottom_left,bottom_right,top_left,top_right])
