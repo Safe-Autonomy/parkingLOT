@@ -39,4 +39,18 @@ def trans_from_x_y_yaw(x, y, yaw):
 									 [0          , 0           , 1,    0],
 									 [0          , 0           , 0,    1]])
 
-# 
+# gnss to image
+def gnss_to_image(lon, lat):
+	x = MAP_IMG_WIDTH * (lon - LONG_ORIGIN) / MAP_IMG_LON_SCALE
+	y = MAP_IMG_HEIGHT - MAP_IMG_HEIGHT * (lat - LAT_ORIGIN) / MAP_IMG_LAT_SCALE
+	
+	if isinstance(x, float):
+		x, y = int(x), int(y)
+	else:
+		x, y = x.astype(int), y.astype(int)
+	return x, y 
+
+# global xy to image
+def global_xy_to_image(x,y):
+	lon, lat = global_xy_to_gnss(x, y)
+	return gnss_to_image(lon, lat)

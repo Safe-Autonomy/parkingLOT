@@ -24,6 +24,8 @@ def bird_viz(binary_warped, mid_line_pts, save_file=None):
 	# cv2.line(out_img, (40, 0), (40, out_img.shape[1] - 1), (255, 0, 0), thickness = 4)
 	# cv2.line(out_img, (out_img.shape[0] - 40, 0), (out_img.shape[0] - 40, out_img.shape[1] - 1), (255, 255, 0), thickness = 4)
 
+
+
 	# Color the middle lane
 	for i in range(len(mid_line_pts)):
 		cv2.circle(out_img, (int(mid_line_pts[i][0]), int(mid_line_pts[i][1])), 5, (0,255,0), -1)
@@ -75,16 +77,23 @@ def fit_one_lane(labeled_lanes,num_points=10):
 	lane[labeled_lanes == 1] = 1
 	
 	#if left or right #TODO: decide lane side
-	# take only the bottom 1/3 of the image for refe
+	# take only the bottom 1/5 of the image for ref
 	height,width = labeled_lanes.shape[:2]
 	left_view = np.zeros_like(labeled_lanes)
 	right_view = np.zeros_like(labeled_lanes)
 
-	left_view[int(3*height/4):,:int(3*width/4)] = lane[int(3*height/4):,:int(3*width/4)]
-	right_view[int(3*height/4):,int(3*width/4):] = lane[int(3*height/4):,int(3*width/4):]  
+	left_view[int(4*height/5):,:int(2*width/4)] = lane[int(4*height/5):,:int(2*width/4)]
+	right_view[int(4*height/5):,int(2*width/4):] = lane[int(4*height/5):,int(2*width/4):]  
 
 	lane_is_right = np.sum(left_view) < np.sum(right_view)
-	offset = np.array([100, 0])
+	# for i in range(left_view.shape[0]-1, 0, -1):
+	# 	if np.max(labeled_lanes[i]) == 0: continue
+
+	# 	idx = np.argmax(labeled_lanes)
+	# 	lane_is_right = ( idx >= (width / 2) )
+	# 	break
+
+	offset = np.array([200, 0])
 
 	nonzero_lane = lane.nonzero()
 	lane_y = np.array(nonzero_lane[0])
@@ -105,10 +114,17 @@ def fit_one_lane(labeled_lanes,num_points=10):
 	return mid_line_pts
 
 def fit_two_lane(labeled_lanes, num_points=10):
+	unique, counts = np.unique(labeled_lanes, return_counts=True)
+
 	lane1 = np.zeros_like(labeled_lanes)
 	lane2 = np.zeros_like(labeled_lanes)
 	lane1[labeled_lanes == 1] = 1
 	lane2[labeled_lanes == 2] = 1
+
+	if 0.5 * counts[1] > counts[2]:
+		return fit_one_lane(lane1)
+	elif 0.5 * counts[2] > counts[1]:
+		return fit_one_lane(lane2)
 
 	# find x and y coodiate for two lane
 	nonzero_lane1 = lane1.nonzero()
@@ -140,5 +156,44 @@ def fit_two_lane(labeled_lanes, num_points=10):
 
 	return mid_line_pts
 
+def fit_largest_lane(labeled_lanes, num_points=10):
+	unique, counts = np.unique(labeled_lanes, return_counts=True)
+	left_label = unique[np.argsort(counts)[-2]]
+	right_label = unique[np.argsort(counts)[-3]]
+	
+		
 
+	lane1 = np.zeros_like(labeled_lanes)
+	lane2 = np.zeros_like(labeled_lanes)
+	lane1[labeled_lanes == left_label] = 1
+	lane2[labeled_lanes == right_label] = 1
 
+	# find x and y coodiate for two lane
+	nonzero_lane1 = lane1.nonzero()
+	lane1_y = np.array(nonzero_lane1[0])
+	lane1_x = np.array(nonzero_lane1[1])
+
+	nonzero_lane2 = lane2.nonzero()
+	lane2_y = np.array(nonzero_lane2[0])
+	lane2_x = np.array(nonzero_lane2[1])
+
+	try:
+		lane1_fit = np.polyfit(lane1_y, lane1_x, 2)
+	####
+	except TypeError:
+		print("Unable to detect lane 1")
+	try:
+		lane2_fit = np.polyfit(lane2_y, lane2_x, 2)
+	####
+	except TypeError:
+		print("Unable to detect lanes 2")
+
+	
+	# find waypoints
+	ploty = np.linspace(0, labeled_lanes.shape[0]-1, num_points)
+	lane1_fitx = lane1_fit[0]*ploty**2 + lane1_fit[1]*ploty + lane1_fit[2]
+	lane2_fitx = lane2_fit[0]*ploty**2 + lane2_fit[1]*ploty + lane2_fit[2]
+	mid_fitx = (lane1_fitx + lane2_fitx)/2.
+	mid_line_pts = np.array([np.transpose(np.vstack([mid_fitx, ploty]))])[0]
+
+	return mid_line_pts

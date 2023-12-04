@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>local_controller</name>
+  <version>1.0.0</version>
+  <description> Local Controller Shit </description>
+
+  <author email="hungdc2@illinois.edu">Henry Che</author>
+  <author email="ziruiw3@illinois.edu">Zirui Wang</author>
+  <author email="anujbs2@illinois.edu">Anuj Sesha</author>
+
+  <maintainer email="hungdc2@illinois.edu"> Henry Che </maintainer>
+  <maintainer email="ziruiw3@illinois.edu"> Zirui Wang </maintainer>
+  <maintainer email="anujbs2@illinois.edu"> Anuj Sesha </maintainer>
+  <url type="repository">https://github.com/Safe-Autonomy/parkingLOT.git</url>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>cv_bridge</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_export_depend>cv_bridge</build_export_depend>
+  <build_export_depend>roscpp</build_export_depend>
+  <build_export_depend>rospy</build_export_depend>
+  <build_export_depend>sensor_msgs</build_export_depend>
+  <build_export_depend>geometry_msgs</build_export_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+</package>

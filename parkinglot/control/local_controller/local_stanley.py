@@ -10,7 +10,7 @@
 # Usage              : rosrun gem_gnss_control gem_gnss_tracker_stanley_rtk.py                                                                      
 # Python version     : 3.8   
 # Longitudinal ctrl  : Ji'an Pan (pja96@illinois.edu), Peng Hang (penghan2@illinois.edu)                                                            
-#==============================================================================
+#================================== ============================================
 
 from __future__ import print_function
 
@@ -112,8 +112,8 @@ class Local_Stanley(object):
         self.speed_filter  = OnlineFilter(1.2, 30, 4)
 
         ######### SUBSCRIBERS ######### 
+        # Speed from GEM
         if not FLAG_GAZEBO:
-            # Speed from GEM
             self.speed_sub  = rospy.Subscriber("/pacmod/parsed_tx/vehicle_speed_rpt", VehicleSpeedRpt, self.speed_callback)
         self.speed      = 0.0
 
@@ -139,14 +139,6 @@ class Local_Stanley(object):
     def speed_callback(self, msg):
         self.speed = round(msg.vehicle_speed, 3) # forward velocity in m/s
 
-    # Get value of steering wheel
-    def steer_callback(self, msg):
-        self.steer = round(np.degrees(msg.output),1)
-
-    def planner_callback(self, msg):
-        # TODO
-        pass
-
 
     # Get predefined waypoints based on local planner(perception)
     def read_waypoints(self, path_points):
@@ -157,15 +149,9 @@ class Local_Stanley(object):
             self.unprocessed_path_points_y = np.array([10])
             self.unprocessed_path_points_heading = np.array([0])
         else:
-            # x towards East and y towards North
-            # self.path_points_x   = path_points[0,:] # longitude
-            # self.path_points_y   = path_points[1,:] # latitude
-            self.unprocessed_path_points_x   = path_points[:,0] # longitude
-            self.unprocessed_path_points_y   = path_points[:,1] # latitude
-            self.unprocessed_path_points_heading = np.arctan2(self.unprocessed_path_points_x, self.unprocessed_path_points_y)
-            # print("point x: ", self.path_points_x)  
-            # print("point y: ", self.path_points_y)  
-            # print("point headings: ", self.path_points_heading)                                                                                                                                                                                                                                                                                                    # heading
+            self.unprocessed_path_points_x   = np.round(path_points[:,0] / 50, 2)# longitude
+            self.unprocessed_path_points_y   = path_points[:,1] # latitude      
+            self.unprocessed_path_points_heading = np.arctan2(self.unprocessed_path_points_x, self.unprocessed_path_points_y)                                                                                                                                                                                                                                                                                        # heading
 
     # Conversion of front wheel to steering wheel
     def front2steer(self, f_angle):
@@ -184,11 +170,6 @@ class Local_Stanley(object):
 
     # for GAZEBO ONLY
     def get_gem_gazebo_speed(self):
-        # Get the current state of the vehicle
-        # Input: None
-        # Output: ModelState, the state of the vehicle, contain the
-        #   position, orientation, linear velocity, angular velocity
-        #   of the vehicle
         rospy.wait_for_service('/gazebo/get_model_state')
         try:
             serviceResponse = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
@@ -197,7 +178,6 @@ class Local_Stanley(object):
             rospy.loginfo("Service did not process request: "+str(exc))
             resp = GetModelStateResponse()
             resp.success = False
-
         
         return resp
 
@@ -212,23 +192,7 @@ class Local_Stanley(object):
                 twist = state.twist
                 self.speed = math.sqrt(twist.linear.x ** 2 + twist.linear.y ** 2)
 
-
-        # vehicle gnss heading (yaw) in degrees
-        # vehicle x, y position in fixed local frame, in meters
-        # rct_errorerence point is located at the center of GNSS antennas
-        # local_x_curr, local_y_curr = 0, 0 #TODO: get local way points from local planner(perception)
-
-        # heading to yaw (degrees to radians)
-        # heading is calculated from two GNSS antennas
-        curr_yaw = 0 
-
-        # rct_errorerence point is located at the center of front axle
-        # curr_x = local_x_curr + self.offset * np.cos(curr_yaw)
-        # curr_y = local_y_curr + self.offset * np.sin(curr_yaw)
-        curr_x = 0
-        curr_y = 0
-
-        return round(curr_x, 3), round(curr_y, 3), round(curr_yaw, 4)
+        return 0, 0, 0
 
     # Conversion to -pi to pi
     def pi_2_pi(self, angle):
@@ -260,103 +224,99 @@ class Local_Stanley(object):
 
             print("[DEBUG] GEM X,Y,Yaw: ", curr_x, curr_y, curr_yaw)
 
-            target_idx = 0 #self.find_close_yaw(self.path_points_yaw, curr_yaw)
+            close_ignore_thresh = 4
 
-            # print("Target list", target_idx)
+            self.target_path_points_x   = self.path_points_x.copy()[close_ignore_thresh:]
+            self.target_path_points_y   = self.path_points_y.copy()[close_ignore_thresh:]
+            self.target_path_points_yaw = self.path_points_yaw.copy()[close_ignore_thresh:]
 
-            close_ignore_thresh = 0
+            print("xs", self.target_path_points_x)
+            print("ys", self.target_path_points_y)
 
-            self.target_path_points_x   = self.path_points_x[close_ignore_thresh:]
-            self.target_path_points_y   = self.path_points_y[close_ignore_thresh:]
-            self.target_path_points_yaw = self.path_points_yaw[close_ignore_thresh:]
-
-            # find the closest point
-            dx = [curr_x - x for x in self.target_path_points_x]
-            dy = [curr_y - y for y in self.target_path_points_y]
-
-            # find the index of closest point
-            target_point_idx = int(np.argmin(np.hypot(dx, dy)))
-
-            target_point_idx = int(np.argmin(np.hypot(dx, dy)))
-
-            print("Target Point Index", target_point_idx + close_ignore_thresh)
-
-
-            if (target_point_idx != len(self.target_path_points_x) -1):
-                target_point_idx = target_point_idx + 1
-
-
-            vec_target_2_front    = np.array([[dx[target_point_idx]], [dy[target_point_idx]]])
-            # front_axle_vec_rot_90 = np.array([[np.cos(curr_yaw - np.pi / 2.0)], [np.sin(curr_yaw - np.pi / 2.0)]])
-            front_axle_vec_rot_0 = np.array([[np.cos(curr_yaw)], [np.sin(curr_yaw)]])
-
-
-            # print("T_X,T_Y,T_Yaw: ", self.target_path_points_x[target_point_idx], \
-            #                          self.target_path_points_y[target_point_idx], \
-            #                          self.target_path_points_yaw[target_point_idx])
-
-            # crosstrack error
-            # ct_error = np.dot(vec_target_2_front.T, front_axle_vec_rot_90)
-            ct_error = np.dot(vec_target_2_front.T, front_axle_vec_rot_0)
-
-            ct_error = float(np.squeeze(ct_error))
-
-            print("Target Point Yaw", self.target_path_points_yaw[target_point_idx])
-            print("Current Yaw", curr_yaw)
-
-            # heading error
-            theta_e = self.pi_2_pi(self.target_path_points_yaw[target_point_idx]-curr_yaw) 
-
-            # theta_e = self.target_path_points_yaw[target_point_idx]-curr_yaw 
-            theta_e_deg = round(np.degrees(theta_e), 1)
-            print("Crosstrack Error: " + str(round(ct_error,3)) + ", Heading Error: " + str(theta_e_deg))
-
-            # --------------------------- Longitudinal control using PD controller ---------------------------
-
-            filt_vel = np.squeeze(self.speed_filter.get_data(self.speed))
-            a_expected = self.pid_speed.get_control(rospy.get_time(), self.desired_speed - filt_vel)
-
-            if a_expected > 0.64 :
-                throttle_percent = 0.5
-
-            if a_expected < 0.0 :
-                throttle_percent = 0.0
-
-            throttle_percent = (a_expected+2.3501) / 7.3454
-
-            if throttle_percent > self.max_accel:
-                throttle_percent = self.max_accel
-
-            if throttle_percent < 0.3:
-                throttle_percent = 0.37
-
-            # -------------------------------------- Stanley controller --------------------------------------
-
-            f_delta        = round(theta_e + np.arctan2(ct_error*10, filt_vel), 3)
-            print("f_delta: ", f_delta)
-            f_delta        = round(np.clip(f_delta, -0.61, 0.61), 3)
-            f_delta_deg    = np.degrees(f_delta)
-            steering_angle = self.front2steer(f_delta_deg)
-            print("steer agnle", steering_angle)
-
-            # if (filt_vel < 0.2):
-            #     self.ackermann_msg.acceleration   = throttle_percent
-            #     self.ackermann_msg.steering_angle = 0
-            #     print(self.ackermann_msg.acceleration, self.ackermann_msg.steering_angle)
-            # else:
-            #     self.ackermann_msg.acceleration   = throttle_percent
-            #     self.ackermann_msg.steering_angle = round(steering_angle,1)
-            #     print(self.ackermann_msg.acceleration, self.ackermann_msg.steering_angle)
-
-            self.ackermann_msg.speed = 0.5
-            print("VEL", filt_vel)
-            # self.ackermann_msg.speed = 0
+            if len(self.target_path_points_yaw) == 0:
+                self.ackermann_msg.speed = 0.5
+                self.ackermann_msg.steering_angle = 0
             
-            self.ackermann_msg.steering_angle = round(steering_angle,5)
-            # self.ackermann_msg.steering_angle = 0
+            else:
+
+                # find the closest point
+                dx = [curr_x - x for x in self.target_path_points_x]
+                dy = [curr_y - y for y in self.target_path_points_y]
+
+                # find the index of closest point
+                target_point_idx = int(np.argmin(np.hypot(dx, dy)))
+                # target_point_idx = -1
+
+                print("Target Point Index", target_point_idx + close_ignore_thresh)
+
+
+                if (target_point_idx != len(self.target_path_points_x) -1):
+                    target_point_idx = target_point_idx + 1
+
+
+                vec_target_2_front    = np.array([[dx[target_point_idx]], [dy[target_point_idx]]])
+                # front_axle_vec_rot_90 = np.array([[np.cos(curr_yaw - np.pi / 2.0)], [np.sin(curr_yaw - np.pi / 2.0)]])
+                front_axle_vec_rot_0 = np.array([[np.cos(curr_yaw)], [np.sin(curr_yaw)]])
+
+
+                # print("T_X,T_Y,T_Yaw: ", self.target_path_points_x[target_point_idx], \
+                #                          self.target_path_points_y[target_point_idx], \
+                #                          self.target_path_points_yaw[target_point_idx])
+
+                # crosstrack error
+                # ct_error = np.dot(vec_target_2_front.T, front_axle_vec_rot_90)
+                ct_error = np.dot(vec_target_2_front.T, front_axle_vec_rot_0)
+
+                ct_error = float(np.squeeze(ct_error))
+
+                print("Target Point Yaw", self.target_path_points_yaw[target_point_idx])
+                print("Current Yaw", curr_yaw)
+
+                # heading error
+                theta_e = self.pi_2_pi(self.target_path_points_yaw[target_point_idx]-curr_yaw) 
+
+                # theta_e = self.target_path_points_yaw[target_point_idx]-curr_yaw 
+                theta_e_deg = round(np.degrees(theta_e), 1)
+                print("Crosstrack Error: " + str(round(ct_error,3)) + ", Heading Error: " + str(theta_e_deg))
+
+                # --------------------------- Longitudinal control using PD controller ---------------------------
+
+                filt_vel = np.squeeze(self.speed_filter.get_data(self.speed))
+                a_expected = self.pid_speed.get_control(rospy.get_time(), self.desired_speed - filt_vel)
+
+                if a_expected > 0.64 :
+                    throttle_percent = 0.5
+
+                if a_expected < 0.0 :
+                    throttle_percent = 0.0
+
+                throttle_percent = (a_expected+2.3501) / 7.3454
+
+                if throttle_percent > self.max_accel:
+                    throttle_percent = self.max_accel
+
+                if throttle_percent < 0.3:
+                    throttle_percent = 0.37
+
+                # -------------------------------------- Stanley controller --------------------------------------
+                f_delta        = round(theta_e + np.arctan2(ct_error*0.4, filt_vel), 3)
+                f_delta        = round(np.clip(f_delta, -0.61, 0.61), 3)
+                print("f_delta: ", f_delta)
+                f_delta_deg    = np.degrees(f_delta)
+                steering_angle = self.front2steer(f_delta_deg)
+                
+                if not FLAG_GAZEBO: 
+                    self.ackermann_msg.acceleration = throttle_percent
+                else:               
+                    self.ackermann_msg.speed = 0.8
+
+                if (filt_vel < 0.2):
+                    self.ackermann_msg.steering_angle = 0
+                else:
+                    self.ackermann_msg.steering_angle = round(f_delta, 2) if FLAG_GAZEBO else round(steering_angle, 2)
 
             # ------------------------------------------------------------------------------------------------ 
-
+            
             self.stanley_pub.publish(self.ackermann_msg)
 
             self.rate.sleep()
@@ -364,7 +324,7 @@ class Local_Stanley(object):
 
 def stanley_run():
 
-    rospy.init_node('local_planner', anonymous=True)
+    rospy.init_node('local_controller', anonymous=True)
     stanley = Local_Stanley()
 
     try:
@@ -375,4 +335,3 @@ def stanley_run():
 
 if __name__ == '__main__':
     stanley_run()
-

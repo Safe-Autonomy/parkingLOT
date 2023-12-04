@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import pickle
 
+from parkinglot.constants import FLAG_GAZEBO
+
 
 def perspective_transform(img, verbose=False):
 	"""
@@ -12,17 +14,17 @@ def perspective_transform(img, verbose=False):
 		[bottom-left, bottom-right, top-left, top-right]
 	"""
 
-	# original
-	# bottom_left = [0,700]
-	# bottom_right = [1280,700]
-	# top_left = [50,500]
-	# top_right = [1200,500]
+	if not FLAG_GAZEBO:
+		bottom_left = [320,630]
+		bottom_right = [1000,630]
+		top_left = [500,440]
+		top_right = [765,440]
 
-	#gazebo tuned
-	bottom_left = [0,700]
-	bottom_right = [1500,700]
-	top_left = [355,500]
-	top_right = [1035,500]
+	else:
+		bottom_left = [0,700]
+		bottom_right = [1500,700]
+		top_left = [355,500]
+		top_right = [1035,500]
 
 
 	# Define 4 source points and 4 destination points

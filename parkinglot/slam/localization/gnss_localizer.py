@@ -9,7 +9,7 @@ from geometry_msgs.msg import Pose
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 
-import parkinglot.slam.utils as slam
+from parkinglot.slam.utils import *
 from parkinglot.constants import *
 
 if not FLAG_GAZEBO:
@@ -42,12 +42,7 @@ class GNSSLocalizer(object):
 		self.heading  = 0
 		self.gnss_sub = rospy.Subscriber("/novatel/inspva", Inspva, self.inspva_callback)
 
-		self.lat_scale    = 0.00062    # 0.0007    
-		self.lon_scale    = 0.00136    # 0.00131   
-
-		self.arrow        = 40 
-		self.img_width    = 2107
-		self.img_height   = 1313
+		self.arrow = 40 
 
 	def inspva_callback(self, inspva_msg):
 		self.lat     = inspva_msg.latitude
@@ -55,13 +50,11 @@ class GNSSLocalizer(object):
 		self.heading = inspva_msg.azimuth 
 
 		# pose
-		curr_x, curr_y = slam.gnss_to_global_xy(self.lon, self.lat)
-		quat = slam.yaw_to_quaternion(self.heading_to_yaw_stanley(self.heading)) 
+		curr_x, curr_y = gnss_to_global_xy(self.lon, self.lat)
+		quat = yaw_to_quaternion(self.heading_to_yaw_stanley(self.heading)) 
 		self.pose_msg.position.x = round(curr_x, 3)
 		self.pose_msg.position.y = round(curr_y, 3)
 		self.pose_msg.orientation = quat
-
-		print(self.lon, self.lat)
 
 		self.pose_pub.publish(self.pose_msg)
 
@@ -90,8 +83,7 @@ class GNSSLocalizer(object):
 		return lon_xd, lat_yd         
 
 	def create_gnss_image(self):
-		lon_x = int(self.img_width*(self.lon-LONG_ORIGIN)/self.lon_scale)
-		lat_y = int(self.img_height-self.img_height*(self.lat-LAT_ORIGIN)/self.lat_scale)
+		lon_x, lat_y = gnss_to_image(self.lon, self.lat)
 		lon_xd, lat_yd = self.image_heading(lon_x, lat_y, self.heading)
 
 		pub_image = np.copy(self.map_image)
@@ -109,17 +101,39 @@ class GNSSLocalizer(object):
 
 		return round(yaw_curr, 4)
 
+	def getModelState(self):
+		rospy.wait_for_service('/gazebo/get_model_state')
+		try:
+			serviceResponse = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
+			resp = serviceResponse(model_name='gem')
+		except rospy.ServiceException as exc:
+			rospy.loginfo("Service did not process request: "+str(exc))
+			resp = GetModelStateResponse()
+			resp.success = False
+		return resp
+
+	def extract_vehicle_info(self, currentPose):
+
+		self.pose_pub.publish(currentPose.pose)
+
 	def start(self):
 		
 		while not rospy.is_shutdown():
 
-			# rviz visualization image
-			pub_image = self.create_gnss_image()
-			try:
-				# Convert OpenCV image to ROS image and publish
-				self.map_image_pub.publish(self.bridge.cv2_to_imgmsg(pub_image, "bgr8"))
-			except CvBridgeError as e:
-				rospy.logerr("CvBridge Error: {0}".format(e))
+			# # rviz visualization image
+			# pub_image = self.create_gnss_image()
+			# try:
+			# 	# Convert OpenCV image to ROS image and publish
+			# 	self.map_image_pub.publish(self.bridge.cv2_to_imgmsg(pub_image, "bgr8"))
+			# except CvBridgeError as e:
+			# 	rospy.logerr("CvBridge Error: {0}".format(e))
+
+			# for GAZEBO ONLY
+			if FLAG_GAZEBO:
+				current_pose = self.getModelState()
+
+				if current_pose.success:
+					self.pose_pub.publish(current_pose.pose)
 
 			self.rate.sleep()
 

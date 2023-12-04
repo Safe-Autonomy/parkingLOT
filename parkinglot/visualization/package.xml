@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>control</name>
+  <name>visualization</name>
   <version>1.0.0</version>
-  <description> Control Shit </description>
+  <description> Viz Shit </description>
 
   <author email="hungdc2@illinois.edu">Henry Che</author>
   <author email="ziruiw3@illinois.edu">Zirui Wang</author>

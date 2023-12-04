@@ -14,7 +14,7 @@ from parkinglot.constants import *
 from YOLOPv2.utils.utils import *
 
 from utils.dataloader import LoadImage
-from utils.line_fit import bird_viz, final_viz, fit_one_lane, fit_two_lane
+from utils.line_fit import *
 from utils.misc import Line, perspective_transform
 
 import rospy
@@ -24,6 +24,8 @@ from std_msgs.msg import Float32MultiArray
 
 class LaneDetector():
     def __init__(self, device=None, enable_ros=True) -> None:
+
+        print("Hi")
 
         # ------------- Rospy Init-------------
         if enable_ros:
@@ -169,6 +171,8 @@ class LaneDetector():
             mid_line_pts = fit_one_lane(labeled_lanes)
         elif num_lanes == 2:
             mid_line_pts = fit_two_lane(labeled_lanes)
+        elif num_lanes > 2:
+            mid_line_pts = fit_largest_lane(labeled_lanes)
         else:
             mid_line_pts = np.array([[0,0]])
         

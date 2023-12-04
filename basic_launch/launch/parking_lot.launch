@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<launch>
+  
+  <!-- ParkingLot system initialization -->
+  <node name="localization" pkg="localization" type="gnss_localizer.py" />
+  <node name="mapping" pkg="mapping" type="lidar_mapper.py" />
+  <node name="visualization" pkg="visualization" type="visualization.py" />
+  
+</launch>

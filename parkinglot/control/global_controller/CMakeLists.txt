@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(control)
+project(global_controller)
 
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge

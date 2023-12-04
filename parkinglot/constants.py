@@ -1,5 +1,5 @@
 
-FLAG_GAZEBO = False
+FLAG_GAZEBO = True
 
 # ---- GEM ----
 if not FLAG_GAZEBO:
@@ -23,4 +23,7 @@ else:
   LAT_ORIGIN = 0 
   LONG_ORIGIN = 0
 
-
+MAP_IMG_WIDTH     = 2107   
+MAP_IMG_HEIGHT    = 1313
+MAP_IMG_LAT_SCALE = 0.00062 
+MAP_IMG_LON_SCALE = 0.00136
