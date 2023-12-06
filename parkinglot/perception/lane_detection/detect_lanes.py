@@ -25,8 +25,6 @@ from std_msgs.msg import Float32MultiArray
 class LaneDetector():
     def __init__(self, device=None, enable_ros=True) -> None:
 
-        print("Hi")
-
         # ------------- Rospy Init-------------
         if enable_ros:
             

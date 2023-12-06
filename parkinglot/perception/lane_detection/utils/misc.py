@@ -21,7 +21,7 @@ def perspective_transform(img, verbose=False):
 		top_right = [765,440]
 
 	else:
-		bottom_left = [0,700]
+		bottom_left = [30,700]
 		bottom_right = [1500,700]
 		top_left = [355,500]
 		top_right = [1035,500]

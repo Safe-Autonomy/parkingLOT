@@ -15,6 +15,8 @@ import scipy.cluster.hierarchy as hcluster
 from parkinglot.slam.utils import *
 from parkinglot.constants import *
 
+SCALE = 1 if not FLAG_GAZEBO else 4
+
 class Visualizer(object):
 	def __init__(self):
 		self.rate = rospy.Rate(20)
@@ -25,8 +27,11 @@ class Visualizer(object):
 		self.viz_pub = rospy.Publisher("/visualization", Image, queue_size=1) 
 
 		# gnss map
-		image_path = '/home/gem/Documents/gem_01/src/parkingLOT/parkinglot/visualization/gnss_map.png'
-		self.gnss_map = cv2.imread(image_path)
+		if not FLAG_GAZEBO:
+			image_path = '/home/gem/Documents/gem_01/src/parkingLOT/parkinglot/visualization/gnss_map.png'
+			self.gnss_map = cv2.imread(image_path)
+		else:
+			self.gnss_map = np.zeros((MAP_IMG_HEIGHT, MAP_IMG_WIDTH, 3)).astype('uint8')
 
 		# obstacles
 		self.obstacles_sub = rospy.Subscriber("/obstacle", Float32MultiArray, self.obstacle_handler, queue_size=1) 
@@ -48,7 +53,8 @@ class Visualizer(object):
 
 	def waypoints_handler(self, data):
 		assert isinstance(data, Float32MultiArray)
-		waypoints = np.asarray(data.data).reshape(-1, 2)
+		if self.waypoints_x is not None: return
+		waypoints = np.asarray(data.data).reshape(-1, 3)
 
 		lat, lon = self.global_xy_to_filter_img(waypoints[:,0], waypoints[:,1])
 		self.waypoints_x, self.waypoints_y = lon, lat
@@ -57,8 +63,8 @@ class Visualizer(object):
 		assert isinstance(data, Float32MultiArray)
 		obstacles = np.asarray(data.data).reshape(-1, 2)
 
-		mask = np.where(obstacles[:,1] > -15, 1, 0)
-		obstacles = obstacles[mask == 1]
+		# mask = np.where(obstacles[:,1] > -15, 1, 0)
+		# obstacles = obstacles[mask == 1]
 
 		thresh = 1
 		clusters = hcluster.fclusterdata(obstacles, thresh, criterion="distance")
@@ -88,6 +94,7 @@ class Visualizer(object):
 		curr_y = data.position.y + self.gps_to_lidar_offset * np.sin(curr_yaw)
 
 		self.x, self.y, self.yaw = round(curr_x, 3), round(curr_y, 3), round(curr_yaw, 4)
+		
 
 	def create_viz_image(self):
 		debug_img = self.gnss_map.copy()
@@ -97,12 +104,13 @@ class Visualizer(object):
 
 		# current location
 		lon_x, lat_y = global_xy_to_image(self.x, self.y)
+		print(lon_x, lat_y )
 		cv2.circle(debug_img, (lon_x, lat_y), 12, (0,255,0), 2)
 
 		# global waypoints
 		if self.waypoints_x is not None:
 			for i in range(len(self.waypoints_x)):
-				cv2.circle(debug_img, (self.waypoints_x[i], self.waypoints_y[i]), 5, (255,255,255), -1)
+				cv2.circle(debug_img, (self.waypoints_x[i], self.waypoints_y[i]), 5 // SCALE, (255,0,0), -1)
 
 		return debug_img
 

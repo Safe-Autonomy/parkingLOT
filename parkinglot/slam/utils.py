@@ -18,7 +18,11 @@ def yaw_to_quaternion(yaw):
 # quaternion to yaw
 def quaternion_to_yaw(quat):
 	assert isinstance(quat, Quaternion)
-	_, _, yaw = euler_from_quaternion([quat.w, quat.x, quat.y, quat.z])
+
+	if not FLAG_GAZEBO:
+		_, _, yaw = euler_from_quaternion([quat.w, quat.x, quat.y, quat.z])
+	else:
+		_, _, yaw = euler_from_quaternion([quat.x, quat.y, quat.z, quat.w])
 
 	return yaw
 
@@ -41,6 +45,13 @@ def trans_from_x_y_yaw(x, y, yaw):
 
 # gnss to image
 def gnss_to_image(lon, lat):
+	# if not FLAG_GAZEBO:
+	# 	x = MAP_IMG_WIDTH * (lon - LONG_ORIGIN) / MAP_IMG_LON_SCALE
+	# 	y = MAP_IMG_HEIGHT - MAP_IMG_HEIGHT * (2 + lat - LAT_ORIGIN) / MAP_IMG_LAT_SCALE
+	# else:
+	# 	x = (lon - LONG_ORIGIN) / MAP_IMG_LON_SCALE
+	# 	y = MAP_IMG_HEIGHT - (lat - LAT_ORIGIN) / MAP_IMG_LAT_SCALE
+
 	x = MAP_IMG_WIDTH * (lon - LONG_ORIGIN) / MAP_IMG_LON_SCALE
 	y = MAP_IMG_HEIGHT - MAP_IMG_HEIGHT * (lat - LAT_ORIGIN) / MAP_IMG_LAT_SCALE
 	

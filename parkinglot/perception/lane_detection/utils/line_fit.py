@@ -20,7 +20,7 @@ def bird_viz(binary_warped, mid_line_pts, save_file=None):
 	out_img = (np.dstack((binary_warped, binary_warped, binary_warped))*255).astype('uint8')
 	window_img = np.zeros_like(out_img)
 
-	# cv2.line(out_img, (out_img.shape[0]//2, 0), (out_img.shape[0]//2, out_img.shape[1] - 1), (0, 0, 255), thickness = 3)
+	cv2.line(out_img, (out_img.shape[0]//2, 0), (out_img.shape[0]//2, out_img.shape[1] - 1), (0, 0, 255), thickness = 3)
 	# cv2.line(out_img, (40, 0), (40, out_img.shape[1] - 1), (255, 0, 0), thickness = 4)
 	# cv2.line(out_img, (out_img.shape[0] - 40, 0), (out_img.shape[0] - 40, out_img.shape[1] - 1), (255, 255, 0), thickness = 4)
 

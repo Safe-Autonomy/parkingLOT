@@ -13,7 +13,7 @@ from hybridastar.hybridastar import hybrid_a_star_planning
 
 class Visualizer(object):
 	def __init__(self):
-		self.rate = rospy.Rate(15)
+		self.rate = rospy.Rate(2)
 
 		# obstacles
 		self.obstacles_sub = rospy.Subscriber("/obstacle", Float32MultiArray, self.obstacle_handler, queue_size=1) 
@@ -33,7 +33,10 @@ class Visualizer(object):
 		self.waypoints_pub = rospy.Publisher("/global_waypoints", Float32MultiArray, queue_size=1) 
 
 		# start = [-23.203, -6.018, -1.95021]
-		self.goal = [-48.741, -2.935, 2.207]
+		if not FLAG_GAZEBO:
+			self.goal = [-56.741, -3.935, 2.207]
+		else:
+			self.goal = [-17.5, -30.95, -1.2]
 
 		# roi 
 		self.roi_x_min = -23
@@ -69,13 +72,14 @@ class Visualizer(object):
 
 			if self.x is not None:
 				start = [self.x, self.y, self.yaw]
+				print(self.x, self.y, self.yaw)
 
 				path = hybrid_a_star_planning(start=start,
-																			goal=self.goal,
-																			ox=[0],
-																			oy=[0],
-																			xy_resolution=0.5,
-																			yaw_resolution=np.deg2rad(2.0))
+											goal=self.goal,
+											ox=[0],
+											oy=[0],
+											xy_resolution=0.05,
+											yaw_resolution=np.deg2rad(1.0))
 				
 				if path is not None:
 					xs = np.array(path.x_list)

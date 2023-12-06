@@ -35,7 +35,7 @@ class LidarMapper(object):
 		self.obstacles_pub = rospy.Publisher("/obstacle", Float32MultiArray, queue_size=1) 
 
 		# point cloud
-		self.point_sub = rospy.Subscriber("/lidar1/velodyne_points", PointCloud2, self.cloud_handler, queue_size=1)
+		self.point_sub = rospy.Subscriber(LIDAR_TOPIC, PointCloud2, self.cloud_handler, queue_size=1)
 		self.current_points = None
 
 		# pose

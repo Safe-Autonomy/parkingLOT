@@ -24,7 +24,7 @@ from car import move, check_car_collision, MAX_STEER, WB, plot_car, BUBBLE_R
 XY_GRID_RESOLUTION = 0.05  # [m]
 YAW_GRID_RESOLUTION = np.deg2rad(1.0)  # [rad]
 MOTION_RESOLUTION = 1  # [m] path interpolate resolution
-N_STEER = 20  # number of steer command
+N_STEER = 50  # number of steer command
 
 SB_COST = 100.0  # switch back penalty cost
 BACK_COST = 5.0  # backward penalty cost

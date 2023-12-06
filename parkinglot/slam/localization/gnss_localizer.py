@@ -40,6 +40,7 @@ class GNSSLocalizer(object):
 		self.lat      = 0
 		self.lon      = 0
 		self.heading  = 0
+		# if not FLAG_GAZEBO:
 		self.gnss_sub = rospy.Subscriber("/novatel/inspva", Inspva, self.inspva_callback)
 
 		self.arrow = 40 
@@ -55,6 +56,8 @@ class GNSSLocalizer(object):
 		self.pose_msg.position.x = round(curr_x, 3)
 		self.pose_msg.position.y = round(curr_y, 3)
 		self.pose_msg.orientation = quat
+
+		print(curr_x, curr_y)
 
 		self.pose_pub.publish(self.pose_msg)
 
