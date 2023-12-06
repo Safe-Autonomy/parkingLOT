@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+  
+  <!-- ParkingLot system initialization -->
+  <node name="lane_detection" pkg="lane_detection" type="detect_lanes.py" />
+  
+</launch>
