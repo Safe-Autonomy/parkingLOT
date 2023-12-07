@@ -11,9 +11,11 @@ from geometry_msgs.msg import Pose
 from sensor_msgs.msg import Image, PointCloud2
 from std_msgs.msg import Float32MultiArray
 import scipy.cluster.hierarchy as hcluster
+from scipy.spatial.transform import Rotation as Rot
 
 from parkinglot.slam.utils import *
 from parkinglot.constants import *
+from parkinglot.planner.hybridastar.car import VRX, VRY
 
 SCALE = 1 if not FLAG_GAZEBO else 4
 
@@ -28,7 +30,8 @@ class Visualizer(object):
 
 		# gnss map
 		if not FLAG_GAZEBO:
-			image_path = '/home/gem/Documents/gem_01/src/parkingLOT/parkinglot/visualization/gnss_map.png'
+			curr_path = os.path.abspath(__file__) 
+			image_path = os.path.dirname(curr_path) + '/gnss_map.png'
 			self.gnss_map = cv2.imread(image_path)
 		else:
 			self.gnss_map = np.zeros((MAP_IMG_HEIGHT, MAP_IMG_WIDTH, 3)).astype('uint8')
@@ -51,6 +54,10 @@ class Visualizer(object):
 		self.waypoints_x = None
 		self.waypoints_y = None
 
+		# metrics 
+		self.frames = 0
+		self.sum = 0
+
 	def waypoints_handler(self, data):
 		assert isinstance(data, Float32MultiArray)
 		if self.waypoints_x is not None: return
@@ -62,14 +69,6 @@ class Visualizer(object):
 	def obstacle_handler(self, data):
 		assert isinstance(data, Float32MultiArray)
 		obstacles = np.asarray(data.data).reshape(-1, 2)
-
-		# mask = np.where(obstacles[:,1] > -15, 1, 0)
-		# obstacles = obstacles[mask == 1]
-
-		thresh = 1
-		clusters = hcluster.fclusterdata(obstacles, thresh, criterion="distance")
-
-		print(len(obstacles))
 
 		lat, lon = self.global_xy_to_filter_img(obstacles[:,0], obstacles[:,1])
 		self.obstacle_map[lat, lon] = 1
@@ -95,6 +94,31 @@ class Visualizer(object):
 
 		self.x, self.y, self.yaw = round(curr_x, 3), round(curr_y, 3), round(curr_yaw, 4)
 		
+	def create_car_contour(self, image):
+		lanes_bitmask = np.zeros_like(image[:,:,0])
+		lanes_bitmask[np.all(self.gnss_map > 200, axis=2)] = 255
+		lanes_bitmask = lanes_bitmask > 0
+
+		rot = Rot.from_euler('z', -self.yaw + np.pi/2).as_matrix()[0:2, 0:2]
+		car_outline_x, car_outline_y = [], []
+		for rx, ry in zip(VRX, VRY):
+			converted_xy = np.stack([rx, ry]).T @ rot
+			car_outline_x.append(converted_xy[0]+self.x)
+			car_outline_y.append(converted_xy[1]+self.y)
+
+		car_bitmask = np.zeros_like(image)
+		car_x, car_y = global_xy_to_image(np.array(car_outline_x), np.array(car_outline_y))
+		for i in range(4):
+			cv2.line(car_bitmask, (car_x[i], car_y[i]), (car_x[(i+1)%4], car_y[(i+1)%4]), (255, 255, 255), thickness=1)
+			cv2.line(image, (car_x[i], car_y[i]), (car_x[(i+1)%4], car_y[(i+1)%4]), (0, 255, 0), thickness=2)
+
+		car_bitmask = np.all(car_bitmask.copy() > 0, axis=2)
+		num_pixel_hits = np.sum(np.bitwise_and(lanes_bitmask, car_bitmask))
+		self.frames += 1
+		is_hit = num_pixel_hits > 5
+		self.sum += is_hit
+		print(f'Frame: {self.frames:4d} Hit: {str(is_hit):5s} Hit ratio: {self.sum / self.frames:.3f} ({self.sum:4d}/{self.frames:4d})')
+		return image
 
 	def create_viz_image(self):
 		debug_img = self.gnss_map.copy()
@@ -102,15 +126,12 @@ class Visualizer(object):
 		# obstacle 
 		debug_img[self.obstacle_map == 1] = [0,0,255]
 
-		# current location
-		lon_x, lat_y = global_xy_to_image(self.x, self.y)
-		print(lon_x, lat_y )
-		cv2.circle(debug_img, (lon_x, lat_y), 12, (0,255,0), 2)
-
 		# global waypoints
 		if self.waypoints_x is not None:
 			for i in range(len(self.waypoints_x)):
 				cv2.circle(debug_img, (self.waypoints_x[i], self.waypoints_y[i]), 5 // SCALE, (255,0,0), -1)
+
+		debug_img = self.create_car_contour(debug_img)
 
 		return debug_img
 
